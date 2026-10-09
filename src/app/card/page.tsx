@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { CATEGORIES, cardHref } from "../cards";
-import { noteStore, useStore } from "../store";
+import { ALL_CARDS, CATEGORIES, cardHref, usesCard } from "../cards";
+import { readingStore, useStore } from "../store";
 import { BAND, BAND_INNER, FOCUS, PANEL, PageHeading, TONES } from "../ui";
 
 export default function CardIndex() {
-  const notes = useStore(noteStore);
-  const counts = new Map<string, number>();
-  for (const note of notes) {
-    counts.set(note.card, (counts.get(note.card) ?? 0) + 1);
-  }
+  const readings = useStore(readingStore);
+  // 每張牌卡出現在幾個問題裡
+  const counts = new Map(
+    ALL_CARDS.map((name) => [
+      name,
+      readings.filter((reading) => usesCard(reading, name)).length,
+    ]),
+  );
 
   return (
     <main className="flex flex-1 flex-col">
-      <PageHeading en="Cards" zh="單星補充" note="點選牌卡，查看或加入補充事項" />
+      <PageHeading en="Cards" zh="星曜連結" note="點選星曜，找出用到它的問題" />
 
       <div className={BAND}>
       <div className={BAND_INNER}>
@@ -52,7 +55,7 @@ export default function CardIndex() {
                             {name}
                             {count > 0 && (
                               <span
-                                title={`補充事項 ${count} 則`}
+                                title={`出現在 ${count} 個問題`}
                                 className={`min-w-5 rounded-full px-1 text-center text-xs leading-5 tracking-normal text-paper-light ${tone.dot}`}
                               >
                                 {count}

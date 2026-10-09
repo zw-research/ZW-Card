@@ -146,7 +146,15 @@ export function relatedCards(name: string): string[] {
   return [];
 }
 
-export const CARD_CATEGORY =new Map<string, Category>(
+// 一筆三牌紀錄有沒有用到這張牌卡；單一主星也算進含有它的雙星組合
+export function usesCard(reading: Record<SlotKey, string>, name: string) {
+  return (
+    SLOTS.some((slot) => reading[slot.key] === name) ||
+    (CARD_CATEGORY.get(name)?.id === "main" && reading.main.includes(name))
+  );
+}
+
+export const CARD_CATEGORY = new Map<string, Category>(
   CATEGORIES.flatMap((category) =>
     category.groups.flatMap((group) =>
       group.cards.map((card) => [card, category] as const),

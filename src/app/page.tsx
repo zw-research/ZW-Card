@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { CARD_CATEGORY, SLOTS } from "./cards";
 import { ReadingForm } from "./reading-form";
 import {
@@ -25,8 +25,21 @@ import {
   TONES,
 } from "./ui";
 
+// 網址 # 後面的紀錄 id；星曜連結頁的問題連結會帶著它過來
+function subscribeHash(listener: () => void) {
+  window.addEventListener("hashchange", listener);
+  return () => window.removeEventListener("hashchange", listener);
+}
+
+function getHash() {
+  return decodeURIComponent(window.location.hash.slice(1));
+}
+
 export default function Home() {
   const readings = useStore(readingStore);
+  const hashId = useSyncExternalStore(subscribeHash, getHash, () => "");
+  // 已經處理過、不再理會的網址 id（按了回首頁之後）
+  const [dismissedHash, setDismissedHash] = useState("");
   const today = useToday();
   // 正在編輯的紀錄 id；"new" 表示新增
   const [editing, setEditing] = useState<string | null>(null);
@@ -37,8 +50,12 @@ export default function Home() {
   const sorted = [...readings].sort(
     (a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt,
   );
-  // 沒有特別選的時候，顯示最新的一筆
-  const selected = sorted.find((reading) => reading.id === selectedId) ?? sorted[0];
+  // 優先順序：自己點選的 → 網址指定的 → 最新的一筆
+  const linkedId = hashId !== dismissedHash ? hashId : "";
+  const selected =
+    sorted.find((reading) => reading.id === selectedId) ??
+    sorted.find((reading) => reading.id === linkedId) ??
+    sorted[0];
 
   const keyword = query.trim();
   const matches = keyword
@@ -59,6 +76,7 @@ export default function Home() {
   useEffect(() => {
     const reset = () => {
       setSelectedId(null);
+      setDismissedHash(getHash());
       setQuery("");
       window.scrollTo({ top: 0 });
     };

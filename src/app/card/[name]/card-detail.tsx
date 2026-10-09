@@ -1,63 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { CARD_CATEGORY, cardHref, relatedCards } from "../../cards";
-import {
-  formatDate,
-  noteStore,
-  readingStore,
-  stamp,
-  useStore,
-  useToday,
-} from "../../store";
-import {
-  BAND,
-  BAND_INNER,
-  BUTTON_PRIMARY,
-  FOCUS,
-  INPUT,
-  PANEL,
-  ReadingItem,
-  TONES,
-} from "../../ui";
+import { CARD_CATEGORY, SLOTS, cardHref, relatedCards, usesCard } from "../../cards";
+import { formatDate, readingStore, useStore } from "../../store";
+import { ArrowCircle, BAND, BAND_INNER, FOCUS, PANEL, TONES } from "../../ui";
 
+// 一顆星曜的頁面：列出用到它的問題，點問題回到首頁看那一筆
 export function CardDetail({ name }: { name: string }) {
-  const notes = useStore(noteStore);
   const readings = useStore(readingStore);
-  const today = useToday();
-  const [text, setText] = useState("");
 
   const category = CARD_CATEGORY.get(name);
   if (!category) return null;
   const tone = TONES[category.tone];
   const related = relatedCards(name);
 
-  const cardNotes = notes
-    .filter((note) => note.card === name)
-    .sort((a, b) => b.createdAt - a.createdAt);
-  // 單一主星也列出含有它的雙星紀錄
   const cardReadings = readings
-    .filter(
-      (reading) =>
-        reading.main === name ||
-        reading.minor === name ||
-        reading.stage === name ||
-        (category.id === "main" && reading.main.includes(name)),
-    )
+    .filter((reading) => usesCard(reading, name))
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
-
-  function addNote() {
-    const trimmed = text.trim();
-    if (!trimmed || !today) return;
-    noteStore.save([...notes, { ...stamp(), date: today, card: name, text: trimmed }]);
-    setText("");
-  }
-
-  function removeNote(id: string) {
-    if (!window.confirm("確定刪除這則補充事項？")) return;
-    noteStore.save(notes.filter((note) => note.id !== id));
-  }
 
   return (
     <main className="flex flex-1 flex-col">
@@ -66,7 +25,7 @@ export function CardDetail({ name }: { name: string }) {
           href="/card"
           className={`text-sm tracking-widest text-ink-soft hover:text-ink ${FOCUS}`}
         >
-          ← 單星補充
+          ← 星曜連結
         </Link>
         <h1 className={`mt-6 text-4xl tracking-[0.12em] sm:text-5xl ${tone.text}`}>{name}</h1>
         <p className="mt-4 flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em]">
@@ -97,85 +56,55 @@ export function CardDetail({ name }: { name: string }) {
       </div>
 
       <div className={BAND}>
-      <div className={BAND_INNER}>
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <section className={`${PANEL} p-5 sm:p-6`}>
-          <h2 className="text-lg font-medium tracking-[0.12em]">補充事項</h2>
-          <form
-            className="mt-3 flex flex-col gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              addNote();
-            }}
-          >
-            <label htmlFor="note" className="sr-only">
-              補充事項
-            </label>
-            <textarea
-              id="note"
-              rows={4}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              placeholder={`寫下對「${name}」的補充事項…`}
-              className={`${INPUT} resize-y leading-7`}
-            />
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-ink-soft">Ctrl + Enter 可直接加入</span>
-              <button type="submit" disabled={!text.trim()} className={BUTTON_PRIMARY}>
-                加入
-              </button>
-            </div>
-          </form>
-
-          {cardNotes.length === 0 ? (
-            <p className="mt-6 text-center text-ink-soft">還沒有補充事項。</p>
-          ) : (
-            <ul className="mt-5 flex flex-col gap-4">
-              {cardNotes.map((note) => (
-                <li key={note.id} className={`border-l-2 pl-3 ${tone.border}`}>
-                  <div className="flex items-baseline justify-between gap-2 text-sm text-ink-soft">
-                    <span>{formatDate(note.date)}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeNote(note.id)}
-                      className={`hover:text-danger ${FOCUS}`}
-                    >
-                      刪除
-                    </button>
-                  </div>
-                  <p className="mt-1 leading-7 break-words whitespace-pre-wrap">
-                    {note.text}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="flex flex-col gap-4">
+        <div className={BAND_INNER}>
           <h2 className="text-lg font-medium tracking-[0.12em]">
-            出現過的三牌紀錄
+            用到這顆星的問題
             <span className="ml-2 text-sm font-normal tracking-normal text-ink-soft">
-              {cardReadings.length} 筆
+              {cardReadings.length} 題
             </span>
           </h2>
           {cardReadings.length === 0 ? (
             <p className={`${PANEL} px-6 py-10 text-center text-ink-soft`}>
-              這張牌卡還沒有出現在三牌紀錄中。
+              還沒有用到「{name}」的問題。
             </p>
           ) : (
-            cardReadings.map((reading) => (
-              <ReadingItem key={reading.id} reading={reading} />
-            ))
+            <ul className={`${PANEL} flex flex-col p-2`}>
+              {cardReadings.map((reading) => (
+                <li key={reading.id} className="border-b border-line last:border-b-0">
+                  <Link
+                    href={`/#${encodeURIComponent(reading.id)}`}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-paper ${FOCUS}`}
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="text-xs tracking-widest text-ink-soft">
+                        {formatDate(reading.date)}
+                      </span>
+                      <span className="font-medium break-words">{reading.question}</span>
+                      <span className="flex flex-wrap gap-1 text-xs">
+                        {SLOTS.map((slot) => {
+                          const card = reading[slot.key];
+                          const owner = CARD_CATEGORY.get(card);
+                          return (
+                            <span
+                              key={slot.key}
+                              className={`rounded-full px-2 py-0.5 ${
+                                owner ? TONES[owner.tone].chip : "bg-paper"
+                              }`}
+                            >
+                              {card}
+                              {reading.reversed?.[slot.key] ? "倒" : "正"}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    </span>
+                    <ArrowCircle />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
-        </section>
-      </div>
-      </div>
+        </div>
       </div>
     </main>
   );

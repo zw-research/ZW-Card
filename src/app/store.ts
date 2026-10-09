@@ -1,14 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { SlotKey } from "./cards";
 
-// 單星的補充事項
-export type Note = {
-  id: string;
-  date: string;
-  card: string;
-  text: string;
-  createdAt: number;
-};
 
 // 每日三牌：主星＋輔星＋長生的整合解析
 export type Reading = {
@@ -96,15 +88,12 @@ function createStore<T>(
   };
 }
 
-export const noteStore = createStore<Note>(
-  "practice1.daily-cards",
-  (item) =>
-    typeof item.id === "string" &&
-    typeof item.date === "string" &&
-    typeof item.card === "string" &&
-    typeof item.text === "string" &&
-    typeof item.createdAt === "number",
-);
+// 單星補充事項的功能已經拿掉；把瀏覽器裡留下的舊資料一併清除
+try {
+  if (typeof window !== "undefined") localStorage.removeItem("practice1.daily-cards");
+} catch {
+  // localStorage 無法使用時不用處理
+}
 
 export const readingStore = createStore<Reading>(
   "practice1.readings",
@@ -143,6 +132,14 @@ export const chartStore = createStore<ChartProfile>(
     typeof item.isLeapMonth === "boolean" &&
     typeof item.timeIndex === "number" &&
     (item.gender === "男" || item.gender === "女"),
+);
+
+// 上次匯出 CSV 的時間，用來只匯出之後新增的資料
+export type ExportMark = { kind: "readings"; at: number };
+
+export const exportMarkStore = createStore<ExportMark>(
+  "practice1.export-marks",
+  (item) => item.kind === "readings" && typeof item.at === "number",
 );
 
 export function useStore<T>(store: Store<T>) {

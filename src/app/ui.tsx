@@ -195,7 +195,7 @@ export function HomeLink({
   );
 }
 
-// 一張牌卡，點下去連到該牌卡的補充事項頁
+// 一張牌卡，點下去連到該牌卡的星曜連結頁
 export function CardTile({
   label,
   name,

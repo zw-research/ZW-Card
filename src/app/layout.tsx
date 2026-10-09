@@ -46,7 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 命盤
               </Link>
               <Link href="/card" className={`${NAV_PILL} bg-paper hover:bg-line`}>
-                單星補充
+                星曜連結
               </Link>
               <Link href="/backup" className={`${NAV_PILL} bg-paper hover:bg-line`}>
                 備份
