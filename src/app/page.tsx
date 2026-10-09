@@ -97,7 +97,7 @@ export default function Home() {
             onClick={() => openForm("new")}
             className={BUTTON_PRIMARY}
           >
-            新增三牌
+            新增問題
           </button>
         )}
       </PageHeading>
@@ -117,7 +117,7 @@ export default function Home() {
       {!selected ? (
         !editing && (
           <p className={`${PANEL} px-6 py-12 text-center text-ink-soft`}>
-            還沒有任何紀錄，按「新增三牌」記下今天的問題與三張牌卡。
+            還沒有任何紀錄，按「新增問題」記下今天的問題與三張牌卡。
           </p>
         )
       ) : (
