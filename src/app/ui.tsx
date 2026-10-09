@@ -14,6 +14,9 @@ export const TONES: Record<
     text: string;
     border: string;
     dot: string;
+    // 區塊外框與標題帶的底色
+    frame: string;
+    band: string;
   }
 > = {
   taupe: {
@@ -23,6 +26,8 @@ export const TONES: Record<
     text: "text-taupe-deep",
     border: "border-taupe",
     dot: "bg-taupe-deep",
+    frame: "border-taupe/40",
+    band: "bg-taupe-soft",
   },
   mist: {
     chip: "bg-mist-soft hover:border-mist",
@@ -31,6 +36,8 @@ export const TONES: Record<
     text: "text-mist-deep",
     border: "border-mist",
     dot: "bg-mist-deep",
+    frame: "border-mist/40",
+    band: "bg-mist-soft",
   },
   gold: {
     chip: "bg-gold-soft hover:border-gold",
@@ -39,6 +46,8 @@ export const TONES: Record<
     text: "text-gold-deep",
     border: "border-gold",
     dot: "bg-gold-deep",
+    frame: "border-gold/40",
+    band: "bg-gold-soft",
   },
   apricot: {
     chip: "bg-apricot-soft hover:border-apricot",
@@ -47,6 +56,8 @@ export const TONES: Record<
     text: "text-apricot-deep",
     border: "border-apricot",
     dot: "bg-apricot-deep",
+    frame: "border-apricot/40",
+    band: "bg-apricot-soft",
   },
 };
 
