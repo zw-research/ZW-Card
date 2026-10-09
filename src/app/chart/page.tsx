@@ -496,13 +496,12 @@ function PalaceCell({
         ? `${layer.badge} text-paper-light`
         : `bg-paper-light ${layer.text}`
     }`;
-  // 電腦版把選到的每一層宮名都排在同一列；層數越多，每個小標越窄
-  const inlineChipSize =
-    chipLayers.length <= 3
-      ? "w-9 text-[15px] leading-6"
-      : chipLayers.length === 4
-        ? "w-8 text-[13px] leading-6"
-        : "w-[25px] text-xs leading-6";
+  // 超過三層時小標只寫宮名一個字，不寫「限年月日時」，是哪一層看顏色
+  const compactChips = chipLayers.length > 3;
+  const chipLabel = (layer: Layer, item: ActiveLayer["item"]) =>
+    (compactChips ? "" : layer.short) + item.palaceNames[palace.index][0];
+  // 電腦版把選到的每一層宮名都排在同一列
+  const inlineChipSize = compactChips ? "w-6 text-[15px] leading-6" : "w-9 text-[15px] leading-6";
   return (
     <div
       style={{ gridRow: row, gridColumn: column }}
@@ -655,8 +654,7 @@ function PalaceCell({
           <div className="ml-auto hidden gap-0.5 @5xl:flex">
             {chipLayers.map(({ layer, item }) => (
               <span key={layer.key} className={`${inlineChipSize} ${layerChip(layer, item)}`}>
-                {layer.short}
-                {item.palaceNames[palace.index][0]}
+                {chipLabel(layer, item)}
               </span>
             ))}
           </div>
@@ -665,18 +663,15 @@ function PalaceCell({
             {palace.earthlyBranch}
           </span>
         </div>
-        {/* 手機放不進同一列，改成排在底下：一排最多三個，超過就折成第二排 */}
+        {/* 手機放不進同一列，改成排在底下等寬的一排 */}
         {chipLayers.length > 0 && (
           <div
             className="grid gap-0.5 @2xl:hidden"
-            style={{
-              gridTemplateColumns: `repeat(${Math.min(chipLayers.length, 3)}, minmax(0, 1fr))`,
-            }}
+            style={{ gridTemplateColumns: `repeat(${chipLayers.length}, minmax(0, 1fr))` }}
           >
             {chipLayers.map(({ layer, item }) => (
               <span key={layer.key} className={`text-[11px] leading-4 ${layerChip(layer, item)}`}>
-                {layer.short}
-                {item.palaceNames[palace.index][0]}
+                {chipLabel(layer, item)}
               </span>
             ))}
           </div>
@@ -689,8 +684,7 @@ function PalaceCell({
           >
             {chipLayers.map(({ layer, item }) => (
               <span key={layer.key} className={`text-[13px] leading-5 ${layerChip(layer, item)}`}>
-                {layer.short}
-                {item.palaceNames[palace.index][0]}
+                {chipLabel(layer, item)}
               </span>
             ))}
           </div>
