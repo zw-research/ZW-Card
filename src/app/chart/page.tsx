@@ -112,13 +112,11 @@ const VISIBLE_LAYERS = 3;
 const MUTAGEN_NAMES = ["祿", "權", "科", "忌"];
 
 // 不顯示的星曜：魁鉞昌曲和天馬只看本命，所以各層的都隱藏；
-// 另外隱藏流月的鸞喜，以及年解
+// 另外隱藏年解
 const HIDDEN_STARS = new Set([
   ...["運", "流", "月", "日", "時"].flatMap((prefix) =>
     ["魁", "鉞", "昌", "曲", "馬"].map((star) => prefix + star),
   ),
-  "月鸞",
-  "月喜",
   "年解",
 ]);
 
@@ -140,20 +138,59 @@ const FLOW_STAR_COLORS: Record<string, string> = {
 };
 // 本命的紅鸞、天喜用酒紅框線標出
 const HIGHLIGHT_NATAL_STARS = new Set(["紅鸞", "天喜"]);
-// 各層的鸞、喜用底色塊突顯：流日的是粉紫，其他層是酒紅
+// 各層的鸞、喜用底色塊突顯：流月、流日的是粉紫，其他層是酒紅
 const HIGHLIGHT_FLOW_STARS = "鸞喜";
 
-type Horoscope = ReturnType<Astrolabe["horoscope"]>;
+type Horoscope = Pick<
+  ReturnType<Astrolabe["horoscope"]>,
+  "lunarDate" | "age" | "decadal" | "yearly" | "monthly" | "daily" | "hourly"
+>;
 type Layer = (typeof LAYERS)[number];
 // 某個層次套在盤上的結果
 type ActiveLayer = { layer: Layer; item: Horoscope[Layer["key"]] };
 
-// 指定日期與時辰的大限、流年、流月、流日、流時
+// 晚子時，一天裡最後一個時辰
+const LAST_TIME_INDEX = 12;
+
+// 指定日期與時辰的大限、流年、流月、流日、流時。
+// 流月照農民曆的節氣月：以節氣交接換月，流月命宮直接落在月支的宮位。
 function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horoscope | null {
   const [year, month, day] = date.split("-").map(Number);
   if (!year || !month || !day) return null;
+  const target = `${year}-${month}-${day}`;
   try {
-    return chart.horoscope(`${year}-${month}-${day}`, timeIndex);
+    const base = chart.horoscope(target, timeIndex);
+
+    // iztro 預設用農曆初一換月；暫時切到節氣分界，取出節氣月的干支、四化與流曜。
+    // 交節那一天整天都算新的月份（和農民曆上標的日期一致），不看交節的時刻，
+    // 所以固定用當天最後一個時辰來判斷。
+    let solarTermMonthly = base.monthly;
+    astro.config({ horoscopeDivide: "exact" });
+    try {
+      solarTermMonthly = chart.horoscope(target, LAST_TIME_INDEX).monthly;
+    } finally {
+      astro.config({ horoscopeDivide: "normal" });
+    }
+
+    // 流月命宮落在月支的宮位，十二宮名跟著轉過去
+    const soul = chart.palaces.findIndex(
+      (palace) => palace.earthlyBranch === solarTermMonthly.earthlyBranch,
+    );
+    const index = soul < 0 ? base.monthly.index : soul;
+    const palaceNames = base.monthly.palaceNames.map(
+      (_, palace) =>
+        base.monthly.palaceNames[(palace - index + base.monthly.index + 12) % 12],
+    );
+
+    return {
+      lunarDate: base.lunarDate,
+      age: base.age,
+      decadal: base.decadal,
+      yearly: base.yearly,
+      monthly: { ...solarTermMonthly, index, palaceNames },
+      daily: base.daily,
+      hourly: base.hourly,
+    };
   } catch {
     return null;
   }
@@ -506,7 +543,7 @@ function PalaceCell({
                 className={`${FLOW_STAR} ${
                   HIGHLIGHT_FLOW_STARS.includes(star.name[1])
                     ? `rounded-[3px] py-0.5 text-paper-light ${
-                        star.name[0] === "日" ? "bg-orchid" : "bg-wine"
+                        "月日".includes(star.name[0]) ? "bg-orchid" : "bg-wine"
                       }`
                     : star.text
                 }`}
