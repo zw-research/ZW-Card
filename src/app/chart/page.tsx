@@ -65,8 +65,8 @@ const POSITIONS = [
   [4, 2],
 ];
 
-// 本命四化用紅框、不填底色；各層運限的底色定義在 LAYERS
-const NATAL_BADGE = "border border-star-red text-star-red";
+// 上方圖例裡「本命」標籤的樣式：只畫框
+const NATAL_BADGE = "border border-ink text-ink";
 
 function buildChart(profile: ChartProfile): Astrolabe | null {
   const date = `${profile.year}-${profile.month}-${profile.day}`;
@@ -139,19 +139,19 @@ const HIDDEN_STARS = new Set([
 const LAYER_PREFIXES = "運流月日時";
 // 各層的祿、羊、陀另外放在格子右下
 const CORNER_FLOW_STARS = "祿羊陀";
-// 本命的擎羊、火星、鈴星用紅色，祿存用綠色，陀羅用藍色
+// 本命的擎羊、陀羅、火星、鈴星用紅色，祿存用綠色
 const NATAL_STAR_COLORS: Record<string, string> = {
   擎羊: "text-star-red",
   火星: "text-star-red",
   鈴星: "text-star-red",
   祿存: "text-star-green",
-  陀羅: "text-star-blue",
+  陀羅: "text-star-red",
 };
 // 各層運限的祿、羊、陀沿用同樣的顏色；是哪一層看第一個字
 const FLOW_STAR_COLORS: Record<string, string> = {
   羊: "text-star-red",
   祿: "text-star-green",
-  陀: "text-star-blue",
+  陀: "text-star-red",
 };
 // 手機上也要顯示的本命星：雜曜裡的陰煞、蜚廉，和將前十二神的指背
 const ALWAYS_SHOWN_STARS = new Set<string>(["陰煞", "蜚廉", "指背"]);
@@ -281,7 +281,17 @@ function findTimeForPalace(
   return null;
 }
 
-// 星名直書：由上而下依序是星名、本命四化、運限四化（不顯示廟旺平陷）
+// 四化的顏色固定：祿綠、權土、科藍、忌紅。本命只畫框，運限填滿。
+const MUTAGEN_STYLES = [
+  { fill: "bg-star-green text-paper-light", outline: "border border-star-green text-star-green" },
+  { fill: "bg-star-earth text-paper-light", outline: "border border-star-earth text-star-earth" },
+  { fill: "bg-star-blue text-paper-light", outline: "border border-star-blue text-star-blue" },
+  { fill: "bg-star-red text-paper-light", outline: "border border-star-red text-star-red" },
+];
+
+// 星名直書，下方是四化（不顯示廟旺平陷）。
+// 四化依層級順序排：本命、大限、流年、流月……
+// 某一層沒有四化時不留空，下面的層級直接往上遞補。
 function StarLabel({
   star,
   layers = [],
@@ -289,7 +299,7 @@ function StarLabel({
   className = "inline-flex",
 }: {
   star: Star;
-  // 選到的每一層；每一層的四化都列出來
+  // 選到的每一層，由大限開始依序排
   layers?: ActiveLayer[];
   // 點選的宮位用宮干飛出去的四化：依序是化祿、化權、化科、化忌的星
   flying?: string[];
@@ -298,9 +308,20 @@ function StarLabel({
   const flyingIndex = flying.indexOf(star.name);
   const VERTICAL = "whitespace-nowrap [writing-mode:vertical-rl]";
   const BADGE =
-    "w-4 rounded text-center text-[10px] leading-4 font-normal @5xl:w-5 @5xl:text-xs @5xl:leading-5";
+    "flex h-4 w-4 items-center justify-center rounded text-[10px] leading-none font-normal @5xl:h-[18px] @5xl:w-[18px] @5xl:text-[13px]";
+
+  // 每一格是祿權科忌的第幾個；沒有四化的層級（-1）直接略過
+  const used = [
+    { label: "本命", natal: true, index: MUTAGEN_NAMES.indexOf(star.mutagen ?? "") },
+    ...layers.map(({ layer, item }) => ({
+      label: layer.label,
+      natal: false,
+      index: item.mutagen.indexOf(star.name),
+    })),
+  ].filter((slot) => slot.index >= 0);
+
   return (
-    <span className={`flex-col items-center gap-0.5 ${className}`}>
+    <span className={`flex-col items-center gap-px ${className}`}>
       {CARD_CATEGORY.has(star.name) ? (
         <Link
           href={cardHref(star.name)}
@@ -313,26 +334,18 @@ function StarLabel({
         <span className={VERTICAL}>{star.name}</span>
       )}
 
-      {star.mutagen && (
-        <span title={`本命化${star.mutagen}`} className={`${BADGE} ${NATAL_BADGE}`}>
-          {star.mutagen}
+      {used.map((slot) => (
+        <span
+          key={slot.label}
+          title={`${slot.label}化${MUTAGEN_NAMES[slot.index]}`}
+          className={`${BADGE} ${
+            slot.natal ? MUTAGEN_STYLES[slot.index].outline : MUTAGEN_STYLES[slot.index].fill
+          }`}
+        >
+          {MUTAGEN_NAMES[slot.index]}
         </span>
-      )}
-      {/* 運限四化：只寫祿權科忌，用底色區分是哪一層 */}
-      {layers.map(({ layer, item }) => {
-        const index = item.mutagen.indexOf(star.name);
-        if (index < 0) return null;
-        return (
-          <span
-            key={layer.key}
-            title={`${layer.label}化${MUTAGEN_NAMES[index]}`}
-            className={`${BADGE} text-paper-light ${layer.badge}`}
-          >
-            {MUTAGEN_NAMES[index]}
-          </span>
-        );
-      })}
-      {/* 點選宮位的宮干四化：深色底、外加一圈框線，和運限四化區分 */}
+      ))}
+      {/* 點選宮位的宮干四化：深色底、外加一圈框線，和本命、運限的四化區分 */}
       {flyingIndex >= 0 && (
         <span
           title={`宮干化${MUTAGEN_NAMES[flyingIndex]}`}
@@ -569,7 +582,7 @@ function PalaceCell({
     ),
   ];
   const FLOW_ROW =
-    "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] @2xl:text-xs @5xl:text-sm @5xl:leading-[1.15]";
+    "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] @2xl:text-xs @5xl:text-[15px] @5xl:leading-[1.15]";
   const FLOW_STAR = "whitespace-nowrap [writing-mode:vertical-rl]";
   // 這一宮在某層運限中的宮名小標；是該運限的命宮時填滿底色
   const layerChip = (layer: Layer, item: ActiveLayer["item"]) =>
@@ -599,7 +612,7 @@ function PalaceCell({
       {/* 星曜區。電腦版把右下那兩排疊在這一區的右下角，不另外佔高度，整張盤才不會太高 */}
       <div className="relative flex flex-1 flex-col @5xl:min-h-36">
       {/* 星曜直書並排：主星、輔星、雜曜、流曜 */}
-      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-3">
+      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-2.5">
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
           {palace.majorStars.map((star) => (
             <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} />
@@ -614,7 +627,7 @@ function PalaceCell({
             ))}
         </div>
         {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜、陰煞、蜚廉另外放到右下 */}
-        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] text-ink-soft @2xl:text-xs @5xl:text-[13px] @5xl:leading-[1.15]">
+        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] text-ink-soft @2xl:text-xs @5xl:text-sm @5xl:leading-[1.15]">
           {palace.adjectiveStars
             .filter(
               (star) =>
@@ -645,7 +658,7 @@ function PalaceCell({
       {/* 右下角固定兩排：上排是陰煞、蜚廉、指背和鸞喜（本命、大限、流年），
           下排是本命的擎羊、陀羅、祿存、火星、鈴星，和各層的祿、羊、陀。
           下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
-      <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-3 @5xl:pb-2">
+      <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-2.5 @5xl:pb-1.5">
         <div className={`justify-end ${FLOW_ROW}`}>
           {/* 陰煞、蜚廉是雜曜；指背是將前十二神落在這一宮的那一顆 */}
           {palace.adjectiveStars
@@ -708,14 +721,14 @@ function PalaceCell({
       </div>
 
       {/* 宮位資訊：用淡米色底和上方的星曜區隔開 */}
-      <div className="flex flex-col gap-1 border-t border-line bg-paper px-1 py-1 @2xl:px-2 @5xl:px-3 @5xl:py-2">
+      <div className="flex flex-col gap-1 border-t border-line bg-paper px-1 py-1 @2xl:px-2 @5xl:px-2.5 @5xl:py-1.5">
         {/* 底列由左到右：宮名、長生與大限歲數、運限宮名、宮干支 */}
         <div className="flex items-end gap-0.5 @5xl:gap-1.5">
           <button
             type="button"
             aria-pressed={state === "selected"}
             aria-label={isSoul ? "命宮" : `${palace.name}宮`}
-            className={`h-3.5 w-3.5 shrink-0 self-center rounded-[3px] bg-wine text-[9px] leading-[14px] font-medium text-paper-light @2xl:h-6 @2xl:w-6 @2xl:rounded-md @2xl:text-sm @2xl:leading-6 @5xl:h-8 @5xl:w-8 @5xl:rounded-lg @5xl:text-base @5xl:leading-8 ${FOCUS}`}
+            className={`h-3.5 w-3.5 shrink-0 self-center rounded-[3px] bg-wine text-[9px] leading-[14px] font-medium text-paper-light @2xl:h-6 @2xl:w-6 @2xl:rounded-md @2xl:text-sm @2xl:leading-6 @5xl:h-7 @5xl:w-7 @5xl:rounded-lg @5xl:text-base @5xl:leading-7 ${FOCUS}`}
           >
             {palace.name[0]}
           </button>
@@ -725,10 +738,10 @@ function PalaceCell({
             </span>
           )}
           <div className="flex flex-col text-ink-soft">
-            <span className="text-[10px] leading-3 whitespace-nowrap @2xl:text-xs @2xl:leading-4 @5xl:text-[13px] @5xl:leading-4">
+            <span className="text-[10px] leading-3 whitespace-nowrap @2xl:text-xs @2xl:leading-4 @5xl:text-sm @5xl:leading-4">
               {palace.changsheng12}
             </span>
-            <span className="text-[9px] leading-3 whitespace-nowrap @2xl:text-[11px] @2xl:leading-4 @5xl:text-xs @5xl:leading-4">
+            <span className="text-[9px] leading-3 whitespace-nowrap @2xl:text-[11px] @2xl:leading-4 @5xl:text-[13px] @5xl:leading-4">
               {palace.decadal.range[0]}–{palace.decadal.range[1]}
             </span>
           </div>
@@ -779,7 +792,7 @@ function PalaceCell({
 // 命盤是電腦版寬度時，依瀏覽器視窗等比例縮放：盡量放大，但整張盤要在一個畫面內看得完，
 // 所以大螢幕字會變大、小視窗字會變小。回傳縮放比例和縮放後的高度；不需要縮放時回傳 null。
 const DESKTOP_CHART_WIDTH = 1024;
-const SCREEN_MARGIN = 32;
+const SCREEN_MARGIN = 16;
 const MIN_FIT_SCALE = 0.55;
 const MAX_FIT_SCALE = 1.6;
 

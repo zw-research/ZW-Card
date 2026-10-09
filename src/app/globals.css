@@ -44,10 +44,11 @@
   --color-wine: #86303d;
   /* 流日鸞喜的粉紫色塊 */
   --color-orchid: #96689a;
-  /* 本命擎羊、祿存、陀羅的紅、綠、藍 */
+  /* 命盤的固定用色：四化是祿綠、權土、科藍、忌紅；擎羊陀羅火鈴用紅、祿存用綠 */
   --color-star-red: #c0463c;
   --color-star-green: #4c8758;
   --color-star-blue: #3d6ea6;
+  --color-star-earth: #96703a;
   /* 命盤的運限需要六種分得開的顏色，四個主色不夠用，另外補上藕紫與苔綠 */
   --color-plum: #86728d;
   --color-moss: #6c7f66;
