@@ -2,7 +2,7 @@
 
 import { astro } from "iztro";
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CARD_CATEGORY, cardHref } from "../cards";
 import { chartStore, useStore, useToday, type ChartProfile } from "../store";
 import {
@@ -506,7 +506,7 @@ function PalaceCell({
     <div
       style={{ gridRow: row, gridColumn: column }}
       onClick={onSelect}
-      className={`flex min-h-36 min-w-0 cursor-pointer flex-col overflow-hidden transition-colors @2xl:min-h-44 @5xl:min-h-52 ${
+      className={`flex min-h-36 min-w-0 cursor-pointer flex-col overflow-hidden transition-colors @2xl:min-h-44 @5xl:min-h-0 ${
         state === "selected"
           ? "bg-pick"
           : state === "related"
@@ -514,6 +514,8 @@ function PalaceCell({
             : "bg-paper-light"
       }`}
     >
+      {/* 星曜區。電腦版把右下那兩排疊在這一區的右下角，不另外佔高度，整張盤才不會太高 */}
+      <div className="relative flex flex-1 flex-col @5xl:min-h-36">
       {/* 星曜直書並排：主星、輔星、雜曜、流曜 */}
       <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-3">
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
@@ -529,22 +531,8 @@ function PalaceCell({
               <StarLabel key={star.name} star={star} layers={chipLayers} />
             ))}
         </div>
-        {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜另外放到右下。
-            陰煞、蜚廉和指背例外：任何寬度都顯示，並用深色粗體排在最前面 */}
+        {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜、陰煞、蜚廉另外放到右下 */}
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] text-ink-soft @2xl:text-xs @5xl:text-[13px] @5xl:leading-[1.15]">
-          {palace.adjectiveStars
-            .filter((star) => ALWAYS_SHOWN_STARS.has(star.name))
-            .map((star) => (
-              <StarLabel
-                key={star.name}
-                star={star}
-                className="inline-flex font-medium text-ink"
-              />
-            ))}
-          {/* 指背不是雜曜，是將前十二神落在這一宮的那一顆 */}
-          {ALWAYS_SHOWN_STARS.has(palace.jiangqian12) && (
-            <span className={`${FLOW_STAR} font-medium text-ink`}>{palace.jiangqian12}</span>
-          )}
           {palace.adjectiveStars
             .filter(
               (star) =>
@@ -572,11 +560,22 @@ function PalaceCell({
         </div>
       </div>
 
-      {/* 右下角固定兩排：上排是鸞喜（本命、大限、流年、流月、流日、流時），
+      {/* 右下角固定兩排：上排是陰煞、蜚廉、指背和鸞喜（本命、大限、流年），
           下排是本命的擎羊、陀羅、祿存、火星、鈴星，和各層的祿、羊、陀。
           下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
-      <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:px-3 @5xl:pb-2">
+      <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-3 @5xl:pb-2">
         <div className={`justify-end ${FLOW_ROW}`}>
+          {/* 陰煞、蜚廉是雜曜；指背是將前十二神落在這一宮的那一顆 */}
+          {palace.adjectiveStars
+            .filter((star) => ALWAYS_SHOWN_STARS.has(star.name))
+            .map((star) => (
+              <span key={star.name} className={`${FLOW_STAR} font-medium text-ink`}>
+                {star.name}
+              </span>
+            ))}
+          {ALWAYS_SHOWN_STARS.has(palace.jiangqian12) && (
+            <span className={`${FLOW_STAR} font-medium text-ink`}>{palace.jiangqian12}</span>
+          )}
           {palace.adjectiveStars
             .filter((star) => HIGHLIGHT_NATAL_STARS.has(star.name))
             .map((star) => (
@@ -623,6 +622,7 @@ function PalaceCell({
               </span>
             ))}
         </div>
+      </div>
       </div>
 
       {/* 宮位資訊：用淡米色底和上方的星曜區隔開 */}
@@ -694,6 +694,45 @@ function PalaceCell({
   );
 }
 
+// 命盤是電腦版寬度時，依瀏覽器視窗等比例縮放：盡量放大，但整張盤要在一個畫面內看得完，
+// 所以大螢幕字會變大、小視窗字會變小。回傳縮放比例和縮放後的高度；不需要縮放時回傳 null。
+const DESKTOP_CHART_WIDTH = 1024;
+const SCREEN_MARGIN = 32;
+const MIN_FIT_SCALE = 0.55;
+const MAX_FIT_SCALE = 1.6;
+
+function useFitToScreen(ref: React.RefObject<HTMLDivElement | null>) {
+  const [fit, setFit] = useState<{ scale: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const update = () => {
+      // offsetWidth、offsetHeight 是縮放前的原始尺寸
+      const naturalWidth = element.offsetWidth;
+      const naturalHeight = element.offsetHeight;
+      if (naturalWidth < DESKTOP_CHART_WIDTH || naturalHeight === 0) {
+        setFit(null);
+        return;
+      }
+      const byHeight = (window.innerHeight - SCREEN_MARGIN) / naturalHeight;
+      const byWidth = (document.documentElement.clientWidth - SCREEN_MARGIN) / naturalWidth;
+      const scale = Math.min(MAX_FIT_SCALE, Math.max(MIN_FIT_SCALE, Math.min(byHeight, byWidth)));
+      setFit(Math.abs(scale - 1) < 0.01 ? null : { scale, height: naturalHeight * scale });
+    };
+    // 觀察開始時會先觸發一次，之後盤面內容或視窗大小改變都會重算
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [ref]);
+
+  return fit;
+}
+
 function ChartView({
   profile,
   chart,
@@ -714,6 +753,8 @@ function ChartView({
   // 選到第幾層：0 只看本命，5 看到流時；一進來就從流時開始
   const [depth, setDepth] = useState<number>(LAYERS.length);
   const [selected, setSelected] = useState<number | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const fit = useFitToScreen(gridRef);
 
   const date = pickedDate ?? today;
   const timeIndex = pickedTime ?? currentTimeIndex;
@@ -878,7 +919,13 @@ function ChartView({
       </section>
 
       <div className="@container">
-      <div className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-line-strong bg-line-strong shadow-[0_8px_24px_-14px_rgb(58_47_41/0.35)]">
+      {/* 電腦版把整張盤依視窗等比例縮放到一個畫面看得完；外層保留縮放後的高度 */}
+      <div style={fit ? { height: fit.height } : undefined}>
+      <div
+        ref={gridRef}
+        style={fit ? { transform: `scale(${fit.scale})`, transformOrigin: "top center" } : undefined}
+        className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-line-strong bg-line-strong shadow-[0_8px_24px_-14px_rgb(58_47_41/0.35)]"
+      >
         {chart.palaces.map((palace) => (
           <PalaceCell
             key={palace.index}
@@ -926,6 +973,7 @@ function ChartView({
           </button>
           </div>
         </div>
+      </div>
       </div>
       </div>
     </div>
