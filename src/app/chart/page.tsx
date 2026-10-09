@@ -458,21 +458,31 @@ function PalaceCell({
   palace,
   state,
   layers,
+  pinned,
   onSelect,
 }: {
   palace: Palace;
   state: "selected" | "related" | "none";
   layers: ActiveLayer[];
+  // 沒有疊在盤上、但鸞喜仍要顯示的層次
+  pinned: ActiveLayer[];
   onSelect: () => void;
 }) {
   const [row, column] = POSITIONS[palace.index];
   const isSoul = palace.name === "命宮";
   // 這一宮裡要顯示的流曜，帶著所屬層次的顏色
-  const flowStars = layers.flatMap(({ layer, item }) =>
-    (item.stars?.[palace.index] ?? [])
-      .filter((star) => !HIDDEN_STARS.has(star.name))
-      .map((star) => ({ name: star.name, text: layer.text })),
-  );
+  const flowStars = [
+    ...layers.flatMap(({ layer, item }) =>
+      (item.stars?.[palace.index] ?? [])
+        .filter((star) => !HIDDEN_STARS.has(star.name))
+        .map((star) => ({ name: star.name, text: layer.text })),
+    ),
+    ...pinned.flatMap(({ layer, item }) =>
+      (item.stars?.[palace.index] ?? [])
+        .filter((star) => HIGHLIGHT_FLOW_STARS.includes(star.name[1]))
+        .map((star) => ({ name: star.name, text: layer.text })),
+    ),
+  ];
   const FLOW_ROW =
     "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] @2xl:text-xs @5xl:text-sm @5xl:leading-[1.15]";
   const FLOW_STAR = "whitespace-nowrap [writing-mode:vertical-rl]";
@@ -659,6 +669,12 @@ function ChartView({
   const isNow = date === today && timeIndex === currentTimeIndex;
 
   // 三方四正：本宮、對宮與兩個三合宮
+  // 流年的鸞喜一直顯示：看到流時的時候盤上只疊月、日、時三層，流年的鸞喜另外補上
+  const pinned: ActiveLayer[] =
+    horoscope && depth >= 2 && !layers.some(({ layer }) => layer.key === "yearly")
+      ? [{ layer: LAYERS[1], item: horoscope.yearly }]
+      : [];
+
   // 沒有手動點選時，自動以所選層次（大限、流年、流月、流日、流時）的命宮為準
   const autoFocus =
     depth > 0 && horoscope ? horoscope[LAYERS[depth - 1].key].index : null;
@@ -804,6 +820,7 @@ function ChartView({
             key={palace.index}
             palace={palace}
             layers={layers}
+            pinned={pinned}
             state={
               focus === palace.index
                 ? "selected"
