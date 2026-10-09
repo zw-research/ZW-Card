@@ -115,6 +115,31 @@ export const readingStore = createStore<Reading>(
     typeof item.createdAt === "number",
 );
 
+// 個人命盤的出生資料；只存一筆
+export type ChartProfile = {
+  name: string;
+  calendar: "solar" | "lunar";
+  year: number;
+  month: number;
+  day: number;
+  isLeapMonth: boolean;
+  timeIndex: number;
+  gender: "男" | "女";
+};
+
+export const chartStore = createStore<ChartProfile>(
+  "practice1.chart",
+  (item) =>
+    typeof item.name === "string" &&
+    (item.calendar === "solar" || item.calendar === "lunar") &&
+    typeof item.year === "number" &&
+    typeof item.month === "number" &&
+    typeof item.day === "number" &&
+    typeof item.isLeapMonth === "boolean" &&
+    typeof item.timeIndex === "number" &&
+    (item.gender === "男" || item.gender === "女"),
+);
+
 export function useStore<T>(store: Store<T>) {
   return useSyncExternalStore(
     store.subscribe,

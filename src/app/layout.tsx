@@ -42,6 +42,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </HomeLink>
             <nav aria-label="主選單" className="flex gap-3">
               <HomeLink className={`${NAV_PILL} bg-paper hover:bg-line`}>每日三牌</HomeLink>
+              <Link href="/chart" className={`${NAV_PILL} bg-paper hover:bg-line`}>
+                命盤
+              </Link>
               <Link
                 href="/card"
                 className={`${NAV_PILL} bg-ink text-paper-light hover:opacity-85`}

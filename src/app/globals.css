@@ -14,6 +14,14 @@
   --color-seal: #c94f43;
   --color-teal: #a9d0c8;
 
+  /* 命盤用：較深的格線、中央區塊底色、選取宮位的兩階淡綠 */
+  --color-line-strong: #d9cfc4;
+  --color-paper-deep: #f1ebe4;
+  --color-teal-soft: #e9f3f0;
+  --color-teal-mid: #cbe3de;
+  /* 本命宮名的酒紅色塊 */
+  --color-wine: #86303d;
+
   /* 四個分類的淡彩：豆沙、霧藍、灰綠、藕紫 */
   --color-bean: #b5908a;
   --color-bean-soft: #f3e8e5;
