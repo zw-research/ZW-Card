@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 const NAV_PILL =
-  "rounded-full px-5 py-2.5 text-sm tracking-[0.12em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+  "rounded-full px-3 py-2 text-xs tracking-[0.08em] whitespace-nowrap transition-colors sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.12em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 NOTES
               </span>
             </HomeLink>
-            <nav aria-label="主選單" className="flex gap-3">
+            <nav aria-label="主選單" className="flex gap-1.5 sm:gap-3">
               <HomeLink className={`${NAV_PILL} bg-paper hover:bg-line`}>每日三牌</HomeLink>
               <Link href="/chart" className={`${NAV_PILL} bg-paper hover:bg-line`}>
                 命盤
