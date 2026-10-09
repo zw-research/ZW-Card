@@ -90,7 +90,7 @@ export default function Home() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <PageHeading en="Daily Reading" zh="每日三牌" note="主星、輔星、長生的整合解析">
+      <PageHeading en="Daily Reading">
         {!editing && (
           <button
             type="button"

@@ -61,7 +61,7 @@ export const BAND = "flex-1 bg-paper";
 export const BAND_INNER =
   "mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-12 sm:px-6";
 
-// 頁面標題：大大的英文字、手繪細線，下方是紅點與中文標題
+// 頁面標題：大大的英文字、手繪細線，下方可選擇加上紅點與中文標題
 export function PageHeading({
   en,
   zh,
@@ -69,7 +69,7 @@ export function PageHeading({
   children,
 }: {
   en: string;
-  zh: string;
+  zh?: string;
   note?: string;
   children?: React.ReactNode;
 }) {
@@ -126,13 +126,19 @@ export function PageHeading({
             d="M8 46C30 22 78 4 104 10C122 15 96 34 62 42C40 47 30 42 44 34"
           />
         </svg>
-        <p aria-hidden className="font-display text-4xl sm:text-5xl">
-          {en}
-        </p>
-        <h1 className="mt-4 flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em]">
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-seal" />
-          {zh}
-        </h1>
+        {zh ? (
+          <>
+            <p aria-hidden className="font-display text-4xl sm:text-5xl">
+              {en}
+            </p>
+            <h1 className="mt-4 flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em]">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-seal" />
+              {zh}
+            </h1>
+          </>
+        ) : (
+          <h1 className="font-display text-4xl sm:text-5xl">{en}</h1>
+        )}
       </div>
       {note && <p className="relative mt-3 text-sm text-ink-soft">{note}</p>}
       {children && <div className="relative mt-7">{children}</div>}
