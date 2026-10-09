@@ -66,20 +66,26 @@ export function PageHeading({
   en,
   zh,
   note,
+  compact = false,
   children,
 }: {
   en: string;
   zh?: string;
   note?: string;
+  // 高度減半的版本，內容為主的頁面用
+  compact?: boolean;
   children?: React.ReactNode;
 }) {
+  const title = compact ? "text-2xl sm:text-3xl" : "text-4xl sm:text-5xl";
   return (
-    <section className="relative overflow-hidden px-4 pt-16 pb-14 text-center">
+    <section
+      className={`relative overflow-hidden px-4 text-center ${compact ? "pt-6 pb-5" : "pt-16 pb-14"}`}
+    >
       {/* 左右兩側的色塊與細線，只在寬螢幕出現 */}
       <svg
         aria-hidden
         viewBox="0 0 320 260"
-        className="pointer-events-none absolute top-0 -left-16 hidden h-64 lg:block"
+        className={`pointer-events-none absolute top-0 hidden lg:block ${compact ? "-left-8 h-32" : "-left-16 h-64"}`}
       >
         <path
           className="fill-haze"
@@ -100,7 +106,7 @@ export function PageHeading({
       <svg
         aria-hidden
         viewBox="0 0 200 200"
-        className="pointer-events-none absolute -right-10 bottom-0 hidden h-44 lg:block"
+        className={`pointer-events-none absolute bottom-0 hidden lg:block ${compact ? "-right-5 h-24" : "-right-10 h-44"}`}
       >
         <path
           className="fill-paper"
@@ -116,7 +122,7 @@ export function PageHeading({
         <svg
           aria-hidden
           viewBox="0 0 120 60"
-          className="pointer-events-none absolute -top-6 -right-16 h-14 w-28"
+          className={`pointer-events-none absolute ${compact ? "-top-3 -right-9 h-8 w-16" : "-top-6 -right-16 h-14 w-28"}`}
           fill="none"
         >
           <path
@@ -128,19 +134,21 @@ export function PageHeading({
         </svg>
         {zh ? (
           <>
-            <p aria-hidden className="font-display text-4xl sm:text-5xl">
+            <p aria-hidden className={`font-display ${title}`}>
               {en}
             </p>
-            <h1 className="mt-4 flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em]">
+            <h1 className={`flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em] ${compact ? "mt-1.5" : "mt-4"}`}>
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
               {zh}
             </h1>
           </>
         ) : (
-          <h1 className="font-display text-4xl sm:text-5xl">{en}</h1>
+          <h1 className={`font-display ${title}`}>{en}</h1>
         )}
       </div>
-      {note && <p className="relative mt-3 text-sm text-ink-soft">{note}</p>}
+      {note && (
+        <p className={`relative text-sm text-ink-soft ${compact ? "mt-1" : "mt-3"}`}>{note}</p>
+      )}
       {children && <div className="relative mt-7">{children}</div>}
     </section>
   );

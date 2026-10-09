@@ -863,9 +863,6 @@ function ChartView({
         </div>
       </div>
       </div>
-      <p className="text-xs leading-5 text-ink-soft sm:text-sm sm:leading-6">
-        盤上一次疊最靠近所選層次的三層運限。每宮下方的小標是這一宮在各運限中的宮名（限＝大限、年＝流年、月＝流月、日＝流日、時＝流時，後面一個字是宮名），填滿底色的是該運限的命宮；星名下方的祿權科忌是四化，底色對應上方「本命、大限、流年…」標籤的顏色。選了大限、流年、流月、流日或流時，會自動標出該層命宮的三方四正；點其他宮位可以改看那一宮，再點一次回到自動。
-      </p>
     </div>
   );
 }
@@ -882,7 +879,7 @@ export default function ChartPage() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <PageHeading en="My Chart" zh="命盤" note="紫微斗數個人命盤" />
+      <PageHeading compact en="My Chart" zh="命盤" note="紫微斗數個人命盤" />
 
       <div className={BAND}>
         <div className={BAND_INNER}>
