@@ -118,6 +118,8 @@ const HIDDEN_STARS = new Set([
     ["魁", "鉞", "昌", "曲", "馬"].map((star) => prefix + star),
   ),
   "年解",
+  // 流月、流日、流時的鸞喜不顯示；本命、大限、流年的保留
+  ...["月", "日", "時"].flatMap((prefix) => [prefix + "鸞", prefix + "喜"]),
 ]);
 
 // 流曜名稱的第一個字，依層次由外而內
@@ -138,9 +140,11 @@ const FLOW_STAR_COLORS: Record<string, string> = {
   祿: "text-star-green",
   陀: "text-star-blue",
 };
+// 手機上也要顯示的本命星：雜曜裡的陰煞、蜚廉，和將前十二神的指背
+const ALWAYS_SHOWN_STARS = new Set<string>(["陰煞", "蜚廉", "指背"]);
 // 本命的紅鸞、天喜用酒紅框線標出
 const HIGHLIGHT_NATAL_STARS = new Set(["紅鸞", "天喜"]);
-// 各層的鸞、喜用底色塊突顯：流年的是酒紅，大限、流月、流日、流時統一用粉紫
+// 運限的鸞、喜用底色塊突顯：流年的是酒紅，大限的是粉紫（流月、流日、流時的不顯示）
 const HIGHLIGHT_FLOW_STARS = "鸞喜";
 
 type Horoscope = Pick<
@@ -528,14 +532,31 @@ function PalaceCell({
             />
           ))}
         </div>
-        {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜另外放到右下 */}
-        <div className="hidden flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-ink-soft @2xl:flex @5xl:text-[13px] @5xl:leading-[1.15]">
+        {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜另外放到右下。
+            陰煞、蜚廉和指背例外：任何寬度都顯示，並用深色粗體排在最前面 */}
+        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] text-ink-soft @2xl:text-xs @5xl:text-[13px] @5xl:leading-[1.15]">
+          {palace.adjectiveStars
+            .filter((star) => ALWAYS_SHOWN_STARS.has(star.name))
+            .map((star) => (
+              <StarLabel
+                key={star.name}
+                star={star}
+                className="inline-flex font-medium text-ink"
+              />
+            ))}
+          {/* 指背不是雜曜，是將前十二神落在這一宮的那一顆 */}
+          {ALWAYS_SHOWN_STARS.has(palace.jiangqian12) && (
+            <span className={`${FLOW_STAR} font-medium text-ink`}>{palace.jiangqian12}</span>
+          )}
           {palace.adjectiveStars
             .filter(
-              (star) => !HIDDEN_STARS.has(star.name) && !HIGHLIGHT_NATAL_STARS.has(star.name),
+              (star) =>
+                !HIDDEN_STARS.has(star.name) &&
+                !HIGHLIGHT_NATAL_STARS.has(star.name) &&
+                !ALWAYS_SHOWN_STARS.has(star.name),
             )
             .map((star) => (
-              <StarLabel key={star.name} star={star} />
+              <StarLabel key={star.name} star={star} className="hidden @2xl:inline-flex" />
             ))}
         </div>
         {/* 運限帶進來的其他流曜 */}
