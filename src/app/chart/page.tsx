@@ -225,6 +225,7 @@ function StarLabel({
   className = "inline-flex",
 }: {
   star: Star;
+  // 選到的每一層；每一層的四化都列出來
   layers?: ActiveLayer[];
   className?: string;
 }) {
@@ -465,6 +466,7 @@ function PalaceCell({
   state,
   layers,
   pinned,
+  chipLayers,
   onSelect,
 }: {
   palace: Palace;
@@ -472,6 +474,8 @@ function PalaceCell({
   layers: ActiveLayer[];
   // 沒有疊在盤上、但鸞喜仍要顯示的層次
   pinned: ActiveLayer[];
+  // 選到的所有層次；每一層的宮名和四化都列出來
+  chipLayers: ActiveLayer[];
   onSelect: () => void;
 }) {
   const [row, column] = POSITIONS[palace.index];
@@ -494,11 +498,18 @@ function PalaceCell({
   const FLOW_STAR = "whitespace-nowrap [writing-mode:vertical-rl]";
   // 這一宮在某層運限中的宮名小標；是該運限的命宮時填滿底色
   const layerChip = (layer: Layer, item: ActiveLayer["item"]) =>
-    `rounded text-center text-[11px] leading-4 whitespace-nowrap @2xl:text-[13px] @2xl:leading-5 @5xl:text-[15px] @5xl:leading-6 ${
+    `rounded text-center whitespace-nowrap ${
       item.index === palace.index
         ? `${layer.badge} text-paper-light`
         : `bg-paper-light ${layer.text}`
     }`;
+  // 電腦版把選到的每一層宮名都排在同一列；層數越多，每個小標越窄
+  const inlineChipSize =
+    chipLayers.length <= 3
+      ? "w-9 text-[15px] leading-6"
+      : chipLayers.length === 4
+        ? "w-8 text-[13px] leading-6"
+        : "w-[25px] text-xs leading-6";
   return (
     <div
       style={{ gridRow: row, gridColumn: column }}
@@ -515,7 +526,7 @@ function PalaceCell({
       <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-3">
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
           {palace.majorStars.map((star) => (
-            <StarLabel key={star.name} star={star} layers={layers} />
+            <StarLabel key={star.name} star={star} layers={chipLayers} />
           ))}
         </div>
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-mist-deep @2xl:text-sm @5xl:gap-x-1 @5xl:text-base @5xl:leading-[1.15]">
@@ -523,7 +534,7 @@ function PalaceCell({
             <StarLabel
               key={star.name}
               star={star}
-              layers={layers}
+              layers={chipLayers}
               className={
                 NATAL_STAR_COLORS[star.name]
                   ? `inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`
@@ -644,8 +655,8 @@ function PalaceCell({
           </div>
           {/* 較寬的畫面：運限宮名夾在大限歲數和干支之間，固定寬度讓各宮對齊 */}
           <div className="ml-auto hidden gap-0.5 @5xl:flex">
-            {layers.map(({ layer, item }) => (
-              <span key={layer.key} className={`w-9 ${layerChip(layer, item)}`}>
+            {chipLayers.map(({ layer, item }) => (
+              <span key={layer.key} className={`${inlineChipSize} ${layerChip(layer, item)}`}>
                 {layer.short}
                 {item.palaceNames[palace.index][0]}
               </span>
@@ -656,14 +667,30 @@ function PalaceCell({
             {palace.earthlyBranch}
           </span>
         </div>
-        {/* 手機放不進同一列，改成底下等寬的一小列 */}
-        {layers.length > 0 && (
+        {/* 手機放不進同一列，改成排在底下：一排最多三個，超過就折成第二排 */}
+        {chipLayers.length > 0 && (
           <div
-            className="grid gap-0.5 @5xl:hidden"
-            style={{ gridTemplateColumns: `repeat(${layers.length}, minmax(0, 1fr))` }}
+            className="grid gap-0.5 @2xl:hidden"
+            style={{
+              gridTemplateColumns: `repeat(${Math.min(chipLayers.length, 3)}, minmax(0, 1fr))`,
+            }}
           >
-            {layers.map(({ layer, item }) => (
-              <span key={layer.key} className={layerChip(layer, item)}>
+            {chipLayers.map(({ layer, item }) => (
+              <span key={layer.key} className={`text-[11px] leading-4 ${layerChip(layer, item)}`}>
+                {layer.short}
+                {item.palaceNames[palace.index][0]}
+              </span>
+            ))}
+          </div>
+        )}
+        {/* 中等寬度一樣放在底下，但選到的每一層都列出來 */}
+        {chipLayers.length > 0 && (
+          <div
+            className="hidden gap-0.5 @2xl:grid @5xl:hidden"
+            style={{ gridTemplateColumns: `repeat(${chipLayers.length}, minmax(0, 1fr))` }}
+          >
+            {chipLayers.map(({ layer, item }) => (
+              <span key={layer.key} className={`text-[13px] leading-5 ${layerChip(layer, item)}`}>
                 {layer.short}
                 {item.palaceNames[palace.index][0]}
               </span>
@@ -708,6 +735,11 @@ function ChartView({
   const isNow = date === today && timeIndex === currentTimeIndex;
 
   // 三方四正：本宮、對宮與兩個三合宮
+  // 選到的每一層（不只盤上疊的三層），用來列出各層的宮名和四化
+  const chipLayers: ActiveLayer[] = horoscope
+    ? LAYERS.slice(0, depth).map((layer) => ({ layer, item: horoscope[layer.key] }))
+    : [];
+
   // 大限和流年的鸞喜一直顯示：盤上只疊最近的三層，這兩層沒被疊上去時，鸞喜另外補上
   const pinned: ActiveLayer[] = horoscope
     ? LAYERS.slice(0, Math.min(depth, 2))
@@ -836,7 +868,7 @@ function ChartView({
             >
               本命
             </span>
-            {layers.map(({ layer, item }) => (
+            {chipLayers.map(({ layer, item }) => (
               <span key={layer.key} className="flex items-center gap-1.5">
                 <span
                   className={`rounded-full px-2 text-xs leading-5 text-paper-light ${layer.badge}`}
@@ -861,6 +893,7 @@ function ChartView({
             palace={palace}
             layers={layers}
             pinned={pinned}
+            chipLayers={chipLayers}
             state={
               focus === palace.index
                 ? "selected"
