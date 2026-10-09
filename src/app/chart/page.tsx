@@ -138,7 +138,7 @@ const FLOW_STAR_COLORS: Record<string, string> = {
 };
 // 本命的紅鸞、天喜用酒紅框線標出
 const HIGHLIGHT_NATAL_STARS = new Set(["紅鸞", "天喜"]);
-// 各層的鸞、喜用底色塊突顯：流月、流日的是粉紫，其他層是酒紅
+// 各層的鸞、喜用底色塊突顯：流年的是酒紅，大限、流月、流日、流時統一用粉紫
 const HIGHLIGHT_FLOW_STARS = "鸞喜";
 
 type Horoscope = Pick<
@@ -553,7 +553,7 @@ function PalaceCell({
                 className={`${FLOW_STAR} ${
                   HIGHLIGHT_FLOW_STARS.includes(star.name[1])
                     ? `rounded-[3px] py-0.5 text-paper-light ${
-                        "月日".includes(star.name[0]) ? "bg-orchid" : "bg-wine"
+                        star.name[0] === "流" ? "bg-wine" : "bg-orchid"
                       }`
                     : star.text
                 }`}
@@ -669,11 +669,12 @@ function ChartView({
   const isNow = date === today && timeIndex === currentTimeIndex;
 
   // 三方四正：本宮、對宮與兩個三合宮
-  // 流年的鸞喜一直顯示：看到流時的時候盤上只疊月、日、時三層，流年的鸞喜另外補上
-  const pinned: ActiveLayer[] =
-    horoscope && depth >= 2 && !layers.some(({ layer }) => layer.key === "yearly")
-      ? [{ layer: LAYERS[1], item: horoscope.yearly }]
-      : [];
+  // 大限和流年的鸞喜一直顯示：盤上只疊最近的三層，這兩層沒被疊上去時，鸞喜另外補上
+  const pinned: ActiveLayer[] = horoscope
+    ? LAYERS.slice(0, Math.min(depth, 2))
+        .filter((pin) => !layers.some(({ layer }) => layer.key === pin.key))
+        .map((layer) => ({ layer, item: horoscope[layer.key] }))
+    : [];
 
   // 沒有手動點選時，自動以所選層次（大限、流年、流月、流日、流時）的命宮為準
   const autoFocus =
