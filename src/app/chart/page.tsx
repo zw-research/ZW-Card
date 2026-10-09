@@ -1,6 +1,6 @@
 "use client";
 
-import { astro } from "iztro";
+import { astro, util } from "iztro";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CARD_CATEGORY, cardHref } from "../cards";
@@ -15,6 +15,19 @@ import {
   PANEL,
   PageHeading,
 } from "../ui";
+
+// 各派有出入的三個天干，明確指定這裡用的四化（依序是祿、權、科、忌）；
+// 本命、各層運限和宮干四化都會跟著用這一組。
+astro.config({
+  mutagens: {
+    // 戊：貪陰右機，和 iztro 預設相同，寫出來是為了不受預設值變動影響
+    戊: ["貪狼", "太陰", "右弼", "天機"],
+    // 庚：陽武同相；iztro 預設是「陽武陰同」
+    庚: ["太陽", "武曲", "天同", "天相"],
+    // 壬：梁紫左武，和 iztro 預設相同
+    壬: ["天梁", "紫微", "左輔", "武曲"],
+  },
+});
 
 type Astrolabe = ReturnType<typeof astro.bySolar>;
 type Palace = Astrolabe["palaces"][number];
@@ -215,17 +228,74 @@ function shiftDate(date: string, days: number) {
   return `${next.getFullYear()}-${mm}-${dd}`;
 }
 
+function shiftYear(date: string, years: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  const next = new Date(year + years, month - 1, day);
+  const mm = String(next.getMonth() + 1).padStart(2, "0");
+  const dd = String(next.getDate()).padStart(2, "0");
+  return `${next.getFullYear()}-${mm}-${dd}`;
+}
+
+// 點宮位換時間：找出「這一層的命宮落在指定宮位」的最近時間。
+// 流時在同一天裡找時辰；流日、流月、流年往前後找最近的日期；大限用那一宮的起始歲數換算年份。
+// 回傳要改成的日期或時辰；找不到就回傳 null。
+function findTimeForPalace(
+  chart: Astrolabe,
+  layerKey: Layer["key"],
+  palace: number,
+  date: string,
+  timeIndex: number,
+): { date?: string; timeIndex?: number } | null {
+  const soulAt = (targetDate: string, targetTime: number) =>
+    getHoroscope(chart, targetDate, targetTime)?.[layerKey].index;
+
+  if (layerKey === "hourly") {
+    for (let time = 0; time < TIMES.length; time++) {
+      if (soulAt(date, time) === palace) return { timeIndex: time };
+    }
+    return null;
+  }
+
+  if (layerKey === "decadal") {
+    const current = getHoroscope(chart, date, timeIndex);
+    if (!current) return null;
+    if (current.decadal.index === palace) return { date };
+    const startAge = chart.palaces[palace].decadal.range[0];
+    return { date: shiftYear(date, startAge - current.age.nominalAge) };
+  }
+
+  // 每一步跨多少、最多找幾步：流日一天一宮；流月每七天看一次一定會落在每個月裡；流年一年一宮
+  const search = {
+    daily: { step: (n: number) => shiftDate(date, n), limit: 15 },
+    monthly: { step: (n: number) => shiftDate(date, n * 7), limit: 30 },
+    yearly: { step: (n: number) => shiftYear(date, n), limit: 6 },
+  }[layerKey];
+
+  for (let distance = 0; distance <= search.limit; distance++) {
+    // 同樣距離時先看往後的時間，再看往前的
+    for (const direction of distance === 0 ? [0] : [1, -1]) {
+      const candidate = search.step(distance * direction);
+      if (soulAt(candidate, timeIndex) === palace) return { date: candidate };
+    }
+  }
+  return null;
+}
+
 // 星名直書：由上而下依序是星名、本命四化、運限四化（不顯示廟旺平陷）
 function StarLabel({
   star,
   layers = [],
+  flying = [],
   className = "inline-flex",
 }: {
   star: Star;
   // 選到的每一層；每一層的四化都列出來
   layers?: ActiveLayer[];
+  // 點選的宮位用宮干飛出去的四化：依序是化祿、化權、化科、化忌的星
+  flying?: string[];
   className?: string;
 }) {
+  const flyingIndex = flying.indexOf(star.name);
   const VERTICAL = "whitespace-nowrap [writing-mode:vertical-rl]";
   const BADGE =
     "w-4 rounded text-center text-[10px] leading-4 font-normal @5xl:w-5 @5xl:text-xs @5xl:leading-5";
@@ -262,6 +332,15 @@ function StarLabel({
           </span>
         );
       })}
+      {/* 點選宮位的宮干四化：深色底、外加一圈框線，和運限四化區分 */}
+      {flyingIndex >= 0 && (
+        <span
+          title={`宮干化${MUTAGEN_NAMES[flyingIndex]}`}
+          className={`${BADGE} bg-ink text-paper-light ring-2 ring-gold`}
+        >
+          {MUTAGEN_NAMES[flyingIndex]}
+        </span>
+      )}
     </span>
   );
 }
@@ -460,6 +539,7 @@ function PalaceCell({
   layers,
   pinned,
   chipLayers,
+  flying,
   onSelect,
 }: {
   palace: Palace;
@@ -469,6 +549,8 @@ function PalaceCell({
   pinned: ActiveLayer[];
   // 選到的所有層次；每一層的宮名和四化都列出來
   chipLayers: ActiveLayer[];
+  // 點選的宮位用宮干飛出去的四化
+  flying: string[];
   onSelect: () => void;
 }) {
   const [row, column] = POSITIONS[palace.index];
@@ -520,7 +602,7 @@ function PalaceCell({
       <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-3">
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
           {palace.majorStars.map((star) => (
-            <StarLabel key={star.name} star={star} layers={chipLayers} />
+            <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} />
           ))}
         </div>
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-mist-deep @2xl:text-sm @5xl:gap-x-1 @5xl:text-base @5xl:leading-[1.15]">
@@ -528,7 +610,7 @@ function PalaceCell({
           {palace.minorStars
             .filter((star) => !NATAL_STAR_COLORS[star.name])
             .map((star) => (
-              <StarLabel key={star.name} star={star} layers={chipLayers} />
+              <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} />
             ))}
         </div>
         {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜、陰煞、蜚廉另外放到右下 */}
@@ -607,7 +689,7 @@ function PalaceCell({
               <StarLabel
                 key={star.name}
                 star={star}
-                layers={chipLayers}
+                layers={chipLayers} flying={flying}
                 className={`inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`}
               />
             ))}
@@ -790,6 +872,26 @@ function ChartView({
   const related =
     focus === null ? [] : [(focus + 6) % 12, (focus + 4) % 12, (focus + 8) % 12];
 
+  // 點宮位：只看本命時標出三方四正並飛宮干四化；
+  // 選了運限層次時，改成跳到「那一層命宮落在這一宮」的時間，盤面就換成那個時間的四化
+  function clickPalace(index: number) {
+    if (depth === 0 || !date) {
+      setSelected(selected === index ? null : index);
+      return;
+    }
+    const target = findTimeForPalace(chart, LAYERS[depth - 1].key, index, date, timeIndex);
+    if (!target) return;
+    if (target.date !== undefined) setPickedDate(target.date);
+    if (target.timeIndex !== undefined) setPickedTime(target.timeIndex);
+    setSelected(null);
+  }
+
+  // 手動點了某一宮時，用那一宮的宮干飛四化；沒有點選時不飛
+  const flyingFrom = selected === null ? null : chart.palaces[selected];
+  const flying: string[] = flyingFrom
+    ? util.getMutagensByHeavenlyStem(flyingFrom.heavenlyStem)
+    : [];
+
   // 換日期、時辰或層次時，放掉手動點選的宮位，回到自動標示
   function changeDate(value: string | null) {
     setPickedDate(value);
@@ -928,6 +1030,31 @@ function ChartView({
         ) : (
           <p className="text-sm text-ink-soft">請選擇日期。</p>
         )}
+
+        {/* 點了宮位之後，列出那一宮宮干飛出去的四化 */}
+        {flyingFrom && (
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-3 text-sm">
+            <span className="rounded-full bg-ink px-2 text-xs leading-5 text-paper-light ring-2 ring-gold">
+              宮干四化
+            </span>
+            <span>
+              {flyingFrom.name === "命宮" ? "命宮" : `${flyingFrom.name}宮`}（{flyingFrom.heavenlyStem}
+              {flyingFrom.earthlyBranch}）
+            </span>
+            {flying.map((star, index) => (
+              <span key={MUTAGEN_NAMES[index]} className="whitespace-nowrap">
+                <span className="text-ink-soft">{MUTAGEN_NAMES[index]}</span> {star}
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className={`text-ink-soft underline underline-offset-4 hover:text-ink ${FOCUS}`}
+            >
+              取消
+            </button>
+          </p>
+        )}
       </section>
 
       <div className="@container">
@@ -945,6 +1072,7 @@ function ChartView({
             layers={layers}
             pinned={pinned}
             chipLayers={chipLayers}
+            flying={flying}
             state={
               focus === palace.index
                 ? "selected"
@@ -952,7 +1080,7 @@ function ChartView({
                   ? "related"
                   : "none"
             }
-            onSelect={() => setSelected(selected === palace.index ? null : palace.index)}
+            onSelect={() => clickPalace(palace.index)}
           />
         ))}
 
