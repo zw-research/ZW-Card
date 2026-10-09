@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <svg aria-hidden viewBox="0 0 36 36" className="h-9 w-9">
                 <circle cx="18" cy="18" r="16" className="fill-ink" />
                 <circle cx="21" cy="15" r="8" className="fill-paper-light" />
-                <circle cx="24" cy="12" r="4" className="fill-seal" />
+                <circle cx="24" cy="12" r="4" className="fill-gold" />
               </svg>
               <span className="text-xl font-medium tracking-[0.12em]">每日牌卡討論</span>
               <span className="hidden font-display text-[10px] leading-tight tracking-[0.15em] sm:block">

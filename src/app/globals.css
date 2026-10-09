@@ -5,36 +5,52 @@
   /* 大標題用的英文字體 */
   --font-display: "Montserrat", "Noto Sans TC", sans-serif;
 
-  /* 白底、米色帶、深褐字 */
-  --color-paper-light: #ffffff;
-  --color-paper: #f8f4f0;
-  --color-ink: #3a2f29;
-  --color-ink-soft: #7b6f67;
-  --color-line: #e9e3dc;
-  --color-seal: #c94f43;
-  --color-teal: #a9d0c8;
+  /* 全站配色：米杏、霧藍、灰咖、淡金 */
 
-  /* 命盤用：較深的格線、中央區塊底色、選取宮位的兩階淡綠 */
-  --color-line-strong: #d9cfc4;
-  --color-paper-deep: #f1ebe4;
-  --color-teal-soft: #e9f3f0;
-  --color-teal-mid: #cbe3de;
-  /* 本命宮名的酒紅色塊 */
+  /* 底色：暖白的卡片、米杏的色帶 */
+  --color-paper-light: #fffdfa;
+  --color-paper: #f6eee3;
+  /* 偏白、略帶灰的底色，用在命盤中央，和十二宮的暖白稍作區隔 */
+  --color-paper-faint: #f7f6f3;
+  --color-line: #e8dece;
+  --color-line-strong: #d5c7b4;
+
+  /* 文字：灰咖 */
+  --color-ink: #554a42;
+  --color-ink-soft: #7d7067;
+
+  /* 點綴：淡金的圓點與標示、霧藍的色塊 */
+  --color-haze: #b9c8d4;
+  /* 錯誤訊息與刪除，維持看得出是警示的磚紅 */
+  --color-danger: #b4544b;
+
+  /* 四個牌卡分類各用一色：灰咖、霧藍、淡金、米杏 */
+  --color-taupe: #9d8d80;
+  --color-taupe-soft: #eee8e2;
+  --color-taupe-deep: #6e6056;
+  --color-mist: #8ea2b2;
+  --color-mist-soft: #e4ebf0;
+  --color-mist-deep: #5a7184;
+  --color-gold: #c9ae72;
+  --color-gold-soft: #f5edd9;
+  --color-gold-deep: #8d7235;
+  --color-apricot: #d3b597;
+  --color-apricot-soft: #f7ecdf;
+  --color-apricot-deep: #8f6945;
+
+  /* 命盤用：選取宮位與三方四正的兩階淡灰、本命宮名的酒紅色塊 */
+  --color-pick-soft: #efeeeb;
+  --color-pick: #e1dfdb;
   --color-wine: #86303d;
-
-  /* 四個分類的淡彩：豆沙、霧藍、灰綠、藕紫 */
-  --color-bean: #b5908a;
-  --color-bean-soft: #f3e8e5;
-  --color-bean-deep: #8a635d;
-  --color-mist: #8c9daa;
-  --color-mist-soft: #e6ecf0;
-  --color-mist-deep: #5f7180;
-  --color-sage: #94a392;
-  --color-sage-soft: #e6ece4;
-  --color-sage-deep: #65765f;
-  --color-lotus: #a497a8;
-  --color-lotus-soft: #ede8ee;
-  --color-lotus-deep: #78697b;
+  /* 流日鸞喜的粉紫色塊 */
+  --color-orchid: #96689a;
+  /* 本命擎羊、祿存、陀羅的紅、綠、藍 */
+  --color-star-red: #c0463c;
+  --color-star-green: #4c8758;
+  --color-star-blue: #3d6ea6;
+  /* 命盤的運限需要六種分得開的顏色，四個主色不夠用，另外補上藕紫與苔綠 */
+  --color-plum: #86728d;
+  --color-moss: #6c7f66;
 }
 
 @layer base {

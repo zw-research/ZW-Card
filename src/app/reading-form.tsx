@@ -212,7 +212,7 @@ export function ReadingForm({
                         className={`py-1 text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink ${
                           chosen
                             ? value
-                              ? "bg-seal text-paper-light"
+                              ? "bg-gold-deep text-paper-light"
                               : "bg-ink text-paper-light"
                             : "text-ink-soft hover:bg-paper-light"
                         }`}
@@ -315,7 +315,7 @@ export function ReadingForm({
               <button
                 type="button"
                 onClick={() => setImageIds(imageIds.filter((item) => item !== id))}
-                className={`text-sm text-ink-soft hover:text-seal ${FOCUS}`}
+                className={`text-sm text-ink-soft hover:text-danger ${FOCUS}`}
               >
                 移除
               </button>
@@ -345,7 +345,7 @@ export function ReadingForm({
           </label>
         </div>
         {uploadError && (
-          <p role="alert" className="text-sm text-seal">
+          <p role="alert" className="text-sm text-danger">
             {uploadError}
           </p>
         )}

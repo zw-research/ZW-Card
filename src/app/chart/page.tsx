@@ -52,8 +52,8 @@ const POSITIONS = [
   [4, 2],
 ];
 
-// 本命四化的底色；各層運限的底色定義在 LAYERS
-const NATAL_BADGE = "bg-bean-deep";
+// 本命四化用紅框、不填底色；各層運限的底色定義在 LAYERS
+const NATAL_BADGE = "border border-star-red text-star-red";
 
 function buildChart(profile: ChartProfile): Astrolabe | null {
   const date = `${profile.year}-${profile.month}-${profile.day}`;
@@ -99,11 +99,11 @@ function placeTianmaByMonth(chart: Astrolabe, timeIndex: number) {
 
 // 運限的五個層次，由外而內
 const LAYERS = [
-  { key: "decadal", label: "大限", short: "限", badge: "bg-lotus-deep", text: "text-lotus-deep" },
+  { key: "decadal", label: "大限", short: "限", badge: "bg-plum", text: "text-plum" },
   { key: "yearly", label: "流年", short: "年", badge: "bg-mist-deep", text: "text-mist-deep" },
-  { key: "monthly", label: "流月", short: "月", badge: "bg-sage-deep", text: "text-sage-deep" },
-  { key: "daily", label: "流日", short: "日", badge: "bg-seal", text: "text-seal" },
-  { key: "hourly", label: "流時", short: "時", badge: "bg-ink", text: "text-ink" },
+  { key: "monthly", label: "流月", short: "月", badge: "bg-moss", text: "text-moss" },
+  { key: "daily", label: "流日", short: "日", badge: "bg-danger", text: "text-danger" },
+  { key: "hourly", label: "流時", short: "時", badge: "bg-gold-deep", text: "text-gold-deep" },
 ] as const;
 
 // 盤面一次最多疊幾層運限，取最靠近所選層次的幾層
@@ -124,7 +124,23 @@ const HIDDEN_STARS = new Set([
 
 // 各層的祿、羊、陀另外放在格子右下
 const CORNER_FLOW_STARS = "祿羊陀";
-// 各層的鸞、喜用酒紅底色塊突顯
+// 本命的擎羊、火星、鈴星用紅色，祿存用綠色，陀羅用藍色
+const NATAL_STAR_COLORS: Record<string, string> = {
+  擎羊: "text-star-red",
+  火星: "text-star-red",
+  鈴星: "text-star-red",
+  祿存: "text-star-green",
+  陀羅: "text-star-blue",
+};
+// 各層運限的祿、羊、陀沿用同樣的顏色；是哪一層看第一個字
+const FLOW_STAR_COLORS: Record<string, string> = {
+  羊: "text-star-red",
+  祿: "text-star-green",
+  陀: "text-star-blue",
+};
+// 本命的紅鸞、天喜用酒紅框線標出
+const HIGHLIGHT_NATAL_STARS = new Set(["紅鸞", "天喜"]);
+// 各層的鸞、喜用底色塊突顯：流日的是粉紫，其他層是酒紅
 const HIGHLIGHT_FLOW_STARS = "鸞喜";
 
 type Horoscope = ReturnType<Astrolabe["horoscope"]>;
@@ -160,12 +176,20 @@ function shiftDate(date: string, days: number) {
 }
 
 // 星名直書：由上而下依序是星名、亮度、本命四化、運限四化
-function StarLabel({ star, layers = [] }: { star: Star; layers?: ActiveLayer[] }) {
+function StarLabel({
+  star,
+  layers = [],
+  className = "inline-flex",
+}: {
+  star: Star;
+  layers?: ActiveLayer[];
+  className?: string;
+}) {
   const VERTICAL = "whitespace-nowrap [writing-mode:vertical-rl]";
   const BADGE =
-    "w-4 rounded text-center text-[10px] leading-4 font-normal text-paper-light sm:w-5 sm:text-xs sm:leading-5";
+    "w-4 rounded text-center text-[10px] leading-4 font-normal @5xl:w-5 @5xl:text-xs @5xl:leading-5";
   return (
-    <span className="inline-flex flex-col items-center gap-0.5">
+    <span className={`flex-col items-center gap-0.5 ${className}`}>
       {CARD_CATEGORY.has(star.name) ? (
         <Link
           href={cardHref(star.name)}
@@ -178,7 +202,7 @@ function StarLabel({ star, layers = [] }: { star: Star; layers?: ActiveLayer[] }
         <span className={VERTICAL}>{star.name}</span>
       )}
       {star.brightness && (
-        <span className="text-[9px] leading-none font-normal text-ink-soft sm:text-[11px]">
+        <span className="text-[9px] leading-none font-normal text-ink-soft @5xl:text-[11px]">
           {star.brightness}
         </span>
       )}
@@ -195,7 +219,7 @@ function StarLabel({ star, layers = [] }: { star: Star; layers?: ActiveLayer[] }
           <span
             key={layer.key}
             title={`${layer.label}化${MUTAGEN_NAMES[index]}`}
-            className={`${BADGE} ${layer.badge}`}
+            className={`${BADGE} text-paper-light ${layer.badge}`}
           >
             {MUTAGEN_NAMES[index]}
           </span>
@@ -374,7 +398,7 @@ function ProfileForm({
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-seal">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
@@ -413,11 +437,11 @@ function PalaceCell({
       .map((star) => ({ name: star.name, text: layer.text })),
   );
   const FLOW_ROW =
-    "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] sm:text-sm sm:leading-[1.15]";
+    "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] @2xl:text-xs @5xl:text-sm @5xl:leading-[1.15]";
   const FLOW_STAR = "whitespace-nowrap [writing-mode:vertical-rl]";
   // 這一宮在某層運限中的宮名小標；是該運限的命宮時填滿底色
   const layerChip = (layer: Layer, item: ActiveLayer["item"]) =>
-    `rounded text-center text-[11px] leading-4 whitespace-nowrap sm:text-[15px] sm:leading-6 ${
+    `rounded text-center text-[11px] leading-4 whitespace-nowrap @2xl:text-[13px] @2xl:leading-5 @5xl:text-[15px] @5xl:leading-6 ${
       item.index === palace.index
         ? `${layer.badge} text-paper-light`
         : `bg-paper-light ${layer.text}`
@@ -426,33 +450,51 @@ function PalaceCell({
     <div
       style={{ gridRow: row, gridColumn: column }}
       onClick={onSelect}
-      className={`flex min-h-36 min-w-0 cursor-pointer flex-col overflow-hidden transition-colors sm:min-h-52 ${
+      className={`flex min-h-36 min-w-0 cursor-pointer flex-col overflow-hidden transition-colors @2xl:min-h-44 @5xl:min-h-52 ${
         state === "selected"
-          ? "bg-teal-mid"
+          ? "bg-pick"
           : state === "related"
-            ? "bg-teal-soft"
+            ? "bg-pick-soft"
             : "bg-paper-light"
       }`}
     >
       {/* 星曜直書並排：主星、輔星、雜曜、流曜 */}
-      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 sm:gap-x-3 sm:gap-y-2 sm:p-3">
-        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-bean-deep sm:gap-x-1.5 sm:text-xl sm:leading-[1.15]">
+      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-3">
+        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
           {palace.majorStars.map((star) => (
             <StarLabel key={star.name} star={star} layers={layers} />
           ))}
         </div>
-        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-mist-deep sm:gap-x-1 sm:text-base sm:leading-[1.15]">
+        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-mist-deep @2xl:text-sm @5xl:gap-x-1 @5xl:text-base @5xl:leading-[1.15]">
           {palace.minorStars.map((star) => (
-            <StarLabel key={star.name} star={star} layers={layers} />
+            <StarLabel
+              key={star.name}
+              star={star}
+              layers={layers}
+              className={
+                NATAL_STAR_COLORS[star.name]
+                  ? `inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`
+                  : undefined
+              }
+            />
           ))}
         </div>
-        {/* 雜曜只在較寬的畫面顯示，手機上省略 */}
-        <div className="hidden flex-wrap items-start gap-x-0.5 gap-y-1 text-[13px] leading-[1.15] text-ink-soft sm:flex">
+        {/* 雜曜只在較寬的畫面顯示，手機上省略；本命的紅鸞、天喜例外，
+            用酒紅框線標出來，手機上也看得到 */}
+        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] text-ink-soft @2xl:text-xs @5xl:text-[13px] @5xl:leading-[1.15]">
           {palace.adjectiveStars
             .filter((star) => !HIDDEN_STARS.has(star.name))
             .map((star) => (
-            <StarLabel key={star.name} star={star} />
-          ))}
+              <StarLabel
+                key={star.name}
+                star={star}
+                className={
+                  HIGHLIGHT_NATAL_STARS.has(star.name)
+                    ? "inline-flex rounded-[3px] border border-wine px-px py-0.5 font-medium text-wine"
+                    : "hidden @2xl:inline-flex"
+                }
+              />
+            ))}
         </div>
         {/* 運限帶進來的其他流曜 */}
         <div className={FLOW_ROW}>
@@ -463,7 +505,9 @@ function PalaceCell({
                 key={star.name}
                 className={`${FLOW_STAR} ${
                   HIGHLIGHT_FLOW_STARS.includes(star.name[1])
-                    ? "rounded-[3px] bg-wine py-0.5 text-paper-light"
+                    ? `rounded-[3px] py-0.5 text-paper-light ${
+                        star.name[0] === "日" ? "bg-orchid" : "bg-wine"
+                      }`
                     : star.text
                 }`}
               >
@@ -474,43 +518,46 @@ function PalaceCell({
       </div>
 
       {/* 各層的祿、羊、陀靠右、偏下，貼在宮位資訊上方 */}
-      <div className={`mt-auto justify-end px-1.5 pb-1 sm:px-3 sm:pb-2 ${FLOW_ROW}`}>
+      <div className={`mt-auto justify-end px-1.5 pb-1 @5xl:px-3 @5xl:pb-2 ${FLOW_ROW}`}>
         {flowStars
           .filter((star) => CORNER_FLOW_STARS.includes(star.name[1]))
           .map((star) => (
-            <span key={star.name} className={`${FLOW_STAR} ${star.text}`}>
+            <span
+              key={star.name}
+              className={`${FLOW_STAR} font-medium ${FLOW_STAR_COLORS[star.name[1]] ?? star.text}`}
+            >
               {star.name}
             </span>
           ))}
       </div>
 
       {/* 宮位資訊：用淡米色底和上方的星曜區隔開 */}
-      <div className="flex flex-col gap-1 border-t border-line bg-paper px-1 py-1 sm:px-3 sm:py-2">
+      <div className="flex flex-col gap-1 border-t border-line bg-paper px-1 py-1 @2xl:px-2 @5xl:px-3 @5xl:py-2">
         {/* 底列由左到右：宮名、長生與大限歲數、運限宮名、宮干支 */}
-        <div className="flex items-end gap-0.5 sm:gap-1.5">
+        <div className="flex items-end gap-0.5 @5xl:gap-1.5">
           <button
             type="button"
             aria-pressed={state === "selected"}
             aria-label={isSoul ? "命宮" : `${palace.name}宮`}
-            className={`h-3.5 w-3.5 shrink-0 self-center rounded-[3px] bg-wine text-[9px] leading-[14px] font-medium text-paper-light sm:h-8 sm:w-8 sm:rounded-lg sm:text-base sm:leading-8 ${FOCUS}`}
+            className={`h-3.5 w-3.5 shrink-0 self-center rounded-[3px] bg-wine text-[9px] leading-[14px] font-medium text-paper-light @2xl:h-6 @2xl:w-6 @2xl:rounded-md @2xl:text-sm @2xl:leading-6 @5xl:h-8 @5xl:w-8 @5xl:rounded-lg @5xl:text-base @5xl:leading-8 ${FOCUS}`}
           >
             {palace.name[0]}
           </button>
           {palace.isBodyPalace && (
-            <span className="shrink-0 self-center rounded bg-teal px-0.5 text-[10px] leading-4 sm:px-1 sm:text-xs sm:leading-5">
+            <span className="shrink-0 self-center rounded bg-haze px-0.5 text-[10px] leading-4 @5xl:px-1 @5xl:text-xs @5xl:leading-5">
               身
             </span>
           )}
           <div className="flex flex-col text-ink-soft">
-            <span className="text-[10px] leading-3 whitespace-nowrap sm:text-[13px] sm:leading-4">
+            <span className="text-[10px] leading-3 whitespace-nowrap @2xl:text-xs @2xl:leading-4 @5xl:text-[13px] @5xl:leading-4">
               {palace.changsheng12}
             </span>
-            <span className="text-[9px] leading-3 whitespace-nowrap sm:text-xs sm:leading-4">
+            <span className="text-[9px] leading-3 whitespace-nowrap @2xl:text-[11px] @2xl:leading-4 @5xl:text-xs @5xl:leading-4">
               {palace.decadal.range[0]}–{palace.decadal.range[1]}
             </span>
           </div>
           {/* 較寬的畫面：運限宮名夾在大限歲數和干支之間，固定寬度讓各宮對齊 */}
-          <div className="ml-auto hidden gap-0.5 sm:flex">
+          <div className="ml-auto hidden gap-0.5 @5xl:flex">
             {layers.map(({ layer, item }) => (
               <span key={layer.key} className={`w-9 ${layerChip(layer, item)}`}>
                 {layer.short}
@@ -518,7 +565,7 @@ function PalaceCell({
               </span>
             ))}
           </div>
-          <span className="ml-auto shrink-0 text-[11px] leading-3 text-ink-soft [writing-mode:vertical-rl] sm:ml-0 sm:text-[15px] sm:leading-4">
+          <span className="ml-auto shrink-0 text-[11px] leading-3 text-ink-soft [writing-mode:vertical-rl] @2xl:text-[13px] @2xl:leading-4 @5xl:ml-0 @5xl:text-[15px] @5xl:leading-4">
             {palace.heavenlyStem}
             {palace.earthlyBranch}
           </span>
@@ -526,7 +573,7 @@ function PalaceCell({
         {/* 手機放不進同一列，改成底下等寬的一小列 */}
         {layers.length > 0 && (
           <div
-            className="grid gap-0.5 sm:hidden"
+            className="grid gap-0.5 @5xl:hidden"
             style={{ gridTemplateColumns: `repeat(${layers.length}, minmax(0, 1fr))` }}
           >
             {layers.map(({ layer, item }) => (
@@ -575,10 +622,26 @@ function ChartView({
   const isNow = date === today && timeIndex === currentTimeIndex;
 
   // 三方四正：本宮、對宮與兩個三合宮
+  // 沒有手動點選時，自動以所選層次（大限、流年、流月、流日、流時）的命宮為準
+  const autoFocus =
+    depth > 0 && horoscope ? horoscope[LAYERS[depth - 1].key].index : null;
+  const focus = selected ?? autoFocus;
   const related =
-    selected === null
-      ? []
-      : [(selected + 6) % 12, (selected + 4) % 12, (selected + 8) % 12];
+    focus === null ? [] : [(focus + 6) % 12, (focus + 4) % 12, (focus + 8) % 12];
+
+  // 換日期、時辰或層次時，放掉手動點選的宮位，回到自動標示
+  function changeDate(value: string | null) {
+    setPickedDate(value);
+    setSelected(null);
+  }
+  function changeTime(value: number | null) {
+    setPickedTime(value);
+    setSelected(null);
+  }
+  function changeDepth(value: number) {
+    setDepth(value);
+    setSelected(null);
+  }
 
   const facts = [
     ["國曆", chart.solarDate],
@@ -599,7 +662,7 @@ function ChartView({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => date && setPickedDate(shiftDate(date, -1))}
+              onClick={() => date && changeDate(shiftDate(date, -1))}
               className={BUTTON_GHOST}
             >
               前一日
@@ -611,12 +674,12 @@ function ChartView({
               id="chart-date"
               type="date"
               value={date}
-              onChange={(event) => setPickedDate(event.target.value || null)}
+              onChange={(event) => changeDate(event.target.value || null)}
               className={INPUT}
             />
             <button
               type="button"
-              onClick={() => date && setPickedDate(shiftDate(date, 1))}
+              onClick={() => date && changeDate(shiftDate(date, 1))}
               className={BUTTON_GHOST}
             >
               後一日
@@ -627,7 +690,7 @@ function ChartView({
             <select
               id="chart-hour"
               value={timeIndex}
-              onChange={(event) => setPickedTime(Number(event.target.value))}
+              onChange={(event) => changeTime(Number(event.target.value))}
               className={INPUT}
             >
               {TIMES.map((label, index) => (
@@ -639,8 +702,8 @@ function ChartView({
             <button
               type="button"
               onClick={() => {
-                setPickedDate(null);
-                setPickedTime(null);
+                changeDate(null);
+                changeTime(null);
               }}
               disabled={isNow}
               className={BUTTON_GHOST}
@@ -659,7 +722,7 @@ function ChartView({
                 key={label}
                 type="button"
                 aria-pressed={depth === index}
-                onClick={() => setDepth(index)}
+                onClick={() => changeDepth(index)}
                 className={`px-1 py-2 text-xs transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink sm:px-4 sm:text-sm ${
                   depth === index ? "bg-ink text-paper-light" : "hover:bg-paper"
                 }`}
@@ -676,7 +739,7 @@ function ChartView({
               農曆 {horoscope.lunarDate}・虛歲 {horoscope.age.nominalAge}
             </span>
             <span
-              className={`rounded-full px-2 text-xs leading-5 text-paper-light ${NATAL_BADGE}`}
+              className={`rounded-full px-2 text-xs leading-5 ${NATAL_BADGE}`}
             >
               本命
             </span>
@@ -697,6 +760,7 @@ function ChartView({
         )}
       </section>
 
+      <div className="@container">
       <div className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-line-strong bg-line-strong shadow-[0_8px_24px_-14px_rgb(58_47_41/0.35)]">
         {chart.palaces.map((palace) => (
           <PalaceCell
@@ -704,7 +768,7 @@ function ChartView({
             palace={palace}
             layers={layers}
             state={
-              selected === palace.index
+              focus === palace.index
                 ? "selected"
                 : related.includes(palace.index)
                   ? "related"
@@ -716,15 +780,17 @@ function ChartView({
 
         <div
           style={{ gridRow: "2 / span 2", gridColumn: "2 / span 2" }}
-          className="flex min-w-0 flex-col items-center justify-center gap-2 bg-paper-deep p-2 text-center sm:gap-5 sm:p-5"
+          className="flex min-w-0 bg-paper-faint p-1 @5xl:p-2"
         >
-          <p className="font-medium tracking-[0.12em] sm:text-2xl">
+          {/* 中央的白色圓角方塊；四周留一圈淺色間隙，和十二宮隔開 */}
+          <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-line bg-paper-light p-2 text-center @5xl:gap-5 @5xl:rounded-3xl @5xl:p-5">
+          <p className="font-medium tracking-[0.12em] @2xl:text-xl @5xl:text-2xl">
             {profile.name || "我的命盤"}
-            <span className="ml-2 text-xs font-normal tracking-normal text-ink-soft sm:text-sm">
+            <span className="ml-2 text-xs font-normal tracking-normal text-ink-soft @5xl:text-sm">
               {chart.gender}
             </span>
           </p>
-          <dl className="grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-[11px] leading-4 sm:gap-x-5 sm:gap-y-1.5 sm:text-base sm:leading-6">
+          <dl className="grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-[11px] leading-4 @2xl:gap-x-3 @2xl:text-sm @2xl:leading-5 @5xl:gap-x-5 @5xl:gap-y-1.5 @5xl:text-base @5xl:leading-6">
             {facts.map(([label, value]) => (
               <div key={label} className="contents">
                 <dt className="text-ink-soft">{label}</dt>
@@ -735,14 +801,16 @@ function ChartView({
           <button
             type="button"
             onClick={onEdit}
-            className={`rounded-full bg-paper-light px-3 py-1.5 text-xs transition-colors hover:bg-line sm:px-6 sm:py-2.5 sm:text-sm ${FOCUS}`}
+            className={`rounded-full border border-line bg-paper-light px-3 py-1.5 text-xs transition-colors hover:bg-line @5xl:px-6 @5xl:py-2.5 @5xl:text-sm ${FOCUS}`}
           >
             修改出生資料
           </button>
+          </div>
         </div>
       </div>
+      </div>
       <p className="text-xs leading-5 text-ink-soft sm:text-sm sm:leading-6">
-        盤上一次疊最靠近所選層次的三層運限。每宮下方的小標是這一宮在各運限中的宮名（限＝大限、年＝流年、月＝流月、日＝流日、時＝流時，後面一個字是宮名），填滿底色的是該運限的命宮；星名下方的祿權科忌是四化，底色對應上方「本命、大限、流年…」標籤的顏色。點任一宮位可標出三方四正，再點一次取消。
+        盤上一次疊最靠近所選層次的三層運限。每宮下方的小標是這一宮在各運限中的宮名（限＝大限、年＝流年、月＝流月、日＝流日、時＝流時，後面一個字是宮名），填滿底色的是該運限的命宮；星名下方的祿權科忌是四化，底色對應上方「本命、大限、流年…」標籤的顏色。選了大限、流年、流月、流日或流時，會自動標出該層命宮的三方四正；點其他宮位可以改看那一宮，再點一次回到自動。
       </p>
     </div>
   );

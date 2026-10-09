@@ -70,7 +70,7 @@ export function CardDetail({ name }: { name: string }) {
         </Link>
         <h1 className={`mt-6 text-4xl tracking-[0.12em] sm:text-5xl ${tone.text}`}>{name}</h1>
         <p className="mt-4 flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em]">
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-seal" />
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
           {category.name}
         </p>
         {related.length > 0 && (
@@ -143,7 +143,7 @@ export function CardDetail({ name }: { name: string }) {
                     <button
                       type="button"
                       onClick={() => removeNote(note.id)}
-                      className={`hover:text-seal ${FOCUS}`}
+                      className={`hover:text-danger ${FOCUS}`}
                     >
                       刪除
                     </button>

@@ -1,4 +1,4 @@
-export type Tone = "bean" | "mist" | "sage" | "lotus";
+export type Tone = "taupe" | "mist" | "gold" | "apricot";
 
 export type CardGroup = {
   name: string;
@@ -18,7 +18,7 @@ export const CATEGORIES: Category[] = [
     id: "main",
     name: "十四主星",
     hint: "紫微、天府兩大星系，另含空宮牌",
-    tone: "bean",
+    tone: "taupe",
     groups: [
       {
         name: "紫微星系",
@@ -70,7 +70,7 @@ export const CATEGORIES: Category[] = [
     id: "minor",
     name: "輔星",
     hint: "六吉、煞星、四化與其他輔星",
-    tone: "sage",
+    tone: "gold",
     groups: [
       {
         name: "六吉星",
@@ -94,7 +94,7 @@ export const CATEGORIES: Category[] = [
     id: "stage",
     name: "十二長生",
     hint: "由長生至養的十二階段",
-    tone: "lotus",
+    tone: "apricot",
     groups: [
       {
         name: "十二長生",

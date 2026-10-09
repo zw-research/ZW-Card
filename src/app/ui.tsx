@@ -16,13 +16,13 @@ export const TONES: Record<
     dot: string;
   }
 > = {
-  bean: {
-    chip: "bg-bean-soft hover:border-bean",
-    active: "bg-bean-deep text-paper-light border-bean-deep",
-    tile: "border-bean/50 bg-bean-soft/60 hover:bg-bean-soft",
-    text: "text-bean-deep",
-    border: "border-bean",
-    dot: "bg-bean-deep",
+  taupe: {
+    chip: "bg-taupe-soft hover:border-taupe",
+    active: "bg-taupe-deep text-paper-light border-taupe-deep",
+    tile: "border-taupe/50 bg-taupe-soft/60 hover:bg-taupe-soft",
+    text: "text-taupe-deep",
+    border: "border-taupe",
+    dot: "bg-taupe-deep",
   },
   mist: {
     chip: "bg-mist-soft hover:border-mist",
@@ -32,21 +32,21 @@ export const TONES: Record<
     border: "border-mist",
     dot: "bg-mist-deep",
   },
-  sage: {
-    chip: "bg-sage-soft hover:border-sage",
-    active: "bg-sage-deep text-paper-light border-sage-deep",
-    tile: "border-sage/50 bg-sage-soft/60 hover:bg-sage-soft",
-    text: "text-sage-deep",
-    border: "border-sage",
-    dot: "bg-sage-deep",
+  gold: {
+    chip: "bg-gold-soft hover:border-gold",
+    active: "bg-gold-deep text-paper-light border-gold-deep",
+    tile: "border-gold/50 bg-gold-soft/60 hover:bg-gold-soft",
+    text: "text-gold-deep",
+    border: "border-gold",
+    dot: "bg-gold-deep",
   },
-  lotus: {
-    chip: "bg-lotus-soft hover:border-lotus",
-    active: "bg-lotus-deep text-paper-light border-lotus-deep",
-    tile: "border-lotus/50 bg-lotus-soft/60 hover:bg-lotus-soft",
-    text: "text-lotus-deep",
-    border: "border-lotus",
-    dot: "bg-lotus-deep",
+  apricot: {
+    chip: "bg-apricot-soft hover:border-apricot",
+    active: "bg-apricot-deep text-paper-light border-apricot-deep",
+    tile: "border-apricot/50 bg-apricot-soft/60 hover:bg-apricot-soft",
+    text: "text-apricot-deep",
+    border: "border-apricot",
+    dot: "bg-apricot-deep",
   },
 };
 
@@ -82,7 +82,7 @@ export function PageHeading({
         className="pointer-events-none absolute top-0 -left-16 hidden h-64 lg:block"
       >
         <path
-          className="fill-teal"
+          className="fill-haze"
           d="M96 40C128 20 168 34 170 70C172 104 140 122 110 116C80 110 70 60 96 40Z"
         />
         <path
@@ -107,7 +107,7 @@ export function PageHeading({
           d="M40 70C70 30 150 30 172 80C192 126 150 176 100 172C50 168 16 110 40 70Z"
         />
         <path
-          className="fill-teal"
+          className="fill-haze"
           d="M120 36C140 24 164 34 166 56C168 78 146 90 128 84C110 78 104 46 120 36Z"
         />
       </svg>
@@ -132,7 +132,7 @@ export function PageHeading({
               {en}
             </p>
             <h1 className="mt-4 flex items-center justify-center gap-2 text-sm font-medium tracking-[0.12em]">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-seal" />
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
               {zh}
             </h1>
           </>
@@ -210,7 +210,7 @@ export function CardTile({
       <span className="sr-only">{label}：</span>
       <span className={`font-medium tracking-[0.12em] ${tone?.text ?? ""}`}>{name}</span>
       <span aria-hidden className="h-4 w-px bg-ink/30" />
-      <span className={reversed ? "font-medium text-seal" : "text-ink-soft"}>
+      <span className={reversed ? "font-medium text-gold-deep" : "text-ink-soft"}>
         {reversed ? "倒" : "正"}
         <span className="sr-only">位</span>
       </span>
@@ -280,7 +280,7 @@ export function ReadingItem({
           </button>
         )}
         {onDelete && (
-          <button type="button" onClick={onDelete} className={`hover:text-seal ${FOCUS}`}>
+          <button type="button" onClick={onDelete} className={`hover:text-danger ${FOCUS}`}>
             刪除
           </button>
         )}
