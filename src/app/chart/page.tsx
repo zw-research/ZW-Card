@@ -215,7 +215,7 @@ function shiftDate(date: string, days: number) {
   return `${next.getFullYear()}-${mm}-${dd}`;
 }
 
-// 星名直書：由上而下依序是星名、亮度、本命四化、運限四化
+// 星名直書：由上而下依序是星名、本命四化、運限四化（不顯示廟旺平陷）
 function StarLabel({
   star,
   layers = [],
@@ -242,11 +242,7 @@ function StarLabel({
       ) : (
         <span className={VERTICAL}>{star.name}</span>
       )}
-      {star.brightness && (
-        <span className="text-[9px] leading-none font-normal text-ink-soft @5xl:text-[11px]">
-          {star.brightness}
-        </span>
-      )}
+
       {star.mutagen && (
         <span title={`本命化${star.mutagen}`} className={`${BADGE} ${NATAL_BADGE}`}>
           {star.mutagen}
@@ -527,18 +523,12 @@ function PalaceCell({
           ))}
         </div>
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-mist-deep @2xl:text-sm @5xl:gap-x-1 @5xl:text-base @5xl:leading-[1.15]">
-          {palace.minorStars.map((star) => (
-            <StarLabel
-              key={star.name}
-              star={star}
-              layers={chipLayers}
-              className={
-                NATAL_STAR_COLORS[star.name]
-                  ? `inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`
-                  : undefined
-              }
-            />
-          ))}
+          {/* 擎羊、陀羅、祿存、火星、鈴星另外放到右下，和運限的祿羊陀排在一起 */}
+          {palace.minorStars
+            .filter((star) => !NATAL_STAR_COLORS[star.name])
+            .map((star) => (
+              <StarLabel key={star.name} star={star} layers={chipLayers} />
+            ))}
         </div>
         {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜另外放到右下。
             陰煞、蜚廉和指背例外：任何寬度都顯示，並用深色粗體排在最前面 */}
@@ -584,7 +574,8 @@ function PalaceCell({
       </div>
 
       {/* 右下角固定兩排：上排是鸞喜（本命、大限、流年、流月、流日、流時），
-          下排是各層的祿、羊、陀。下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
+          下排是本命的擎羊、陀羅、祿存、火星、鈴星，和各層的祿、羊、陀。
+          下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
       <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:px-3 @5xl:pb-2">
         <div className={`justify-end ${FLOW_ROW}`}>
           {palace.adjectiveStars
@@ -612,6 +603,16 @@ function PalaceCell({
             ))}
         </div>
         <div className={`min-h-[2.3em] justify-end ${FLOW_ROW}`}>
+          {palace.minorStars
+            .filter((star) => NATAL_STAR_COLORS[star.name])
+            .map((star) => (
+              <StarLabel
+                key={star.name}
+                star={star}
+                layers={chipLayers}
+                className={`inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`}
+              />
+            ))}
           {flowStars
             .filter((star) => CORNER_FLOW_STARS.includes(star.name[1]))
             .map((star) => (
