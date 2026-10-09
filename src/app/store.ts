@@ -31,6 +31,8 @@ type Store<T> = {
   getSnapshot: () => T[];
   getServerSnapshot: () => T[];
   save: (items: T[]) => void;
+  // 從外部資料（例如備份檔）挑出格式正確的項目
+  pickValid: (data: unknown) => T[];
 };
 
 function createStore<T>(
@@ -43,14 +45,16 @@ function createStore<T>(
   let cachedRaw = "";
   let cached: T[] = empty;
 
+  function pickValid(data: unknown): T[] {
+    if (!Array.isArray(data)) return [];
+    return data.filter(
+      (item): item is T => typeof item === "object" && item !== null && isValid(item),
+    );
+  }
+
   function parse(raw: string): T[] {
     try {
-      const data: unknown = JSON.parse(raw);
-      if (!Array.isArray(data)) return [];
-      return data.filter(
-        (item): item is T =>
-          typeof item === "object" && item !== null && isValid(item),
-      );
+      return pickValid(JSON.parse(raw));
     } catch {
       return [];
     }
@@ -88,6 +92,7 @@ function createStore<T>(
       }
       listeners.forEach((listener) => listener());
     },
+    pickValid,
   };
 }
 
@@ -255,4 +260,38 @@ export async function deleteImages(ids: string[]) {
   } catch {
     // 刪不掉只會留下用不到的圖片，不影響使用
   }
+}
+
+// ---------- 備份用：圖片和文字互轉 ----------
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// 把指定的圖片讀出來，轉成可以寫進備份檔的文字
+export async function exportImages(ids: string[]) {
+  const images: Record<string, string> = {};
+  for (const id of ids) {
+    const blob = await loadImage(id);
+    if (blob) images[id] = await blobToDataUrl(blob);
+  }
+  return images;
+}
+
+// 把備份檔裡的圖片存回瀏覽器，沿用原本的 id；回傳成功存回的張數
+export async function importImages(images: Record<string, string>) {
+  let count = 0;
+  for (const [id, dataUrl] of Object.entries(images)) {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) continue;
+    const blob = await (await fetch(dataUrl)).blob();
+    await withImages("readwrite", (store) => {
+      store.put(blob, id);
+    });
+    count += 1;
+  }
+  return count;
 }

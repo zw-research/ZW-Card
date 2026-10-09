@@ -45,11 +45,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/chart" className={`${NAV_PILL} bg-paper hover:bg-line`}>
                 命盤
               </Link>
-              <Link
-                href="/card"
-                className={`${NAV_PILL} bg-ink text-paper-light hover:opacity-85`}
-              >
+              <Link href="/card" className={`${NAV_PILL} bg-paper hover:bg-line`}>
                 單星補充
+              </Link>
+              <Link href="/backup" className={`${NAV_PILL} bg-paper hover:bg-line`}>
+                備份
               </Link>
             </nav>
           </div>
