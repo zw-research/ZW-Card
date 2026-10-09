@@ -767,6 +767,9 @@ function ChartView({
     : [];
   const isNow = date === today && timeIndex === currentTimeIndex;
 
+  // 日期與時辰那一排的按鈕、輸入框：手機上比較小，才排得進一排
+  const CONTROL_BUTTON = `shrink-0 rounded-full bg-paper px-2.5 py-1.5 text-xs whitespace-nowrap transition-colors hover:bg-line disabled:opacity-40 sm:px-6 sm:py-2.5 sm:text-sm sm:tracking-[0.12em] ${FOCUS}`;
+  const CONTROL_INPUT = `rounded-lg border border-line bg-paper-light px-1.5 py-1.5 text-xs sm:px-4 sm:py-2.5 sm:text-base ${FOCUS}`;
   // 三方四正：本宮、對宮與兩個三合宮
   // 選到的每一層（不只盤上疊的三層），用來列出各層的宮名和四化
   const chipLayers: ActiveLayer[] = horoscope
@@ -817,13 +820,18 @@ function ChartView({
       {/* 運限：選日期、時辰與要看到哪一層 */}
       <section className={`${PANEL} flex flex-col gap-4 p-4 sm:p-5`}>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="flex flex-wrap items-center gap-2">
+          {/* 手機上縮成一排：前後一日用箭頭，時辰只露出名稱 */}
+          <div className="flex w-full items-center gap-1 sm:w-auto sm:flex-wrap sm:gap-2">
             <button
               type="button"
+              aria-label="前一日"
               onClick={() => date && changeDate(shiftDate(date, -1))}
-              className={BUTTON_GHOST}
+              className={CONTROL_BUTTON}
             >
-              前一日
+              <span aria-hidden className="sm:hidden">
+                ‹
+              </span>
+              <span className="hidden sm:inline">前一日</span>
             </button>
             <label htmlFor="chart-date" className="sr-only">
               運限日期
@@ -833,14 +841,18 @@ function ChartView({
               type="date"
               value={date}
               onChange={(event) => changeDate(event.target.value || null)}
-              className={INPUT}
+              className={`min-w-0 flex-1 sm:flex-none ${CONTROL_INPUT}`}
             />
             <button
               type="button"
+              aria-label="後一日"
               onClick={() => date && changeDate(shiftDate(date, 1))}
-              className={BUTTON_GHOST}
+              className={CONTROL_BUTTON}
             >
-              後一日
+              <span aria-hidden className="sm:hidden">
+                ›
+              </span>
+              <span className="hidden sm:inline">後一日</span>
             </button>
             <label htmlFor="chart-hour" className="sr-only">
               運限時辰
@@ -849,7 +861,7 @@ function ChartView({
               id="chart-hour"
               value={timeIndex}
               onChange={(event) => changeTime(Number(event.target.value))}
-              className={INPUT}
+              className={`w-[4.25rem] shrink-0 sm:w-auto ${CONTROL_INPUT}`}
             >
               {TIMES.map((label, index) => (
                 <option key={label} value={index}>
@@ -864,7 +876,7 @@ function ChartView({
                 changeTime(null);
               }}
               disabled={isNow}
-              className={BUTTON_GHOST}
+              className={CONTROL_BUTTON}
             >
               現在
             </button>
