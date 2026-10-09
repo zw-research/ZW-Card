@@ -1,26 +1,38 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  /* 大標題用的英文字體 */
+  --font-display: "Montserrat", "Noto Sans TC", sans-serif;
+
+  /* 白底、米色帶、深褐字 */
+  --color-paper-light: #ffffff;
+  --color-paper: #f8f4f0;
+  --color-ink: #3a2f29;
+  --color-ink-soft: #7b6f67;
+  --color-line: #e9e3dc;
+  --color-seal: #c94f43;
+  --color-teal: #a9d0c8;
+
+  /* 四個分類的淡彩：豆沙、霧藍、灰綠、藕紫 */
+  --color-bean: #b5908a;
+  --color-bean-soft: #f3e8e5;
+  --color-bean-deep: #8a635d;
+  --color-mist: #8c9daa;
+  --color-mist-soft: #e6ecf0;
+  --color-mist-deep: #5f7180;
+  --color-sage: #94a392;
+  --color-sage-soft: #e6ece4;
+  --color-sage-deep: #65765f;
+  --color-lotus: #a497a8;
+  --color-lotus-soft: #ede8ee;
+  --color-lotus-deep: #78697b;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    color: var(--color-ink);
+    background-color: var(--color-paper-light);
+    font-family: var(--font-sans);
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
