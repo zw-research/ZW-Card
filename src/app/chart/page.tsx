@@ -159,7 +159,7 @@ type ActiveLayer = { layer: Layer; item: Horoscope[Layer["key"]] };
 const LAST_TIME_INDEX = 12;
 
 // 指定日期與時辰的大限、流年、流月、流日、流時。
-// 流月照農民曆的節氣月：以節氣交接換月，流月命宮直接落在月支的宮位。
+// 流月的干支與四化照農民曆的節氣月（節氣交接換月），流月命宮則用斗君法照農曆月份排。
 function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horoscope | null {
   const [year, month, day] = date.split("-").map(Number);
   if (!year || !month || !day) return null;
@@ -178,22 +178,19 @@ function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horosc
       astro.config({ horoscopeDivide: "normal" });
     }
 
-    // 流月命宮落在月支的宮位，十二宮名跟著轉過去
-    const soul = chart.palaces.findIndex(
-      (palace) => palace.earthlyBranch === solarTermMonthly.earthlyBranch,
-    );
-    const index = soul < 0 ? base.monthly.index : soul;
-    const palaceNames = base.monthly.palaceNames.map(
-      (_, palace) =>
-        base.monthly.palaceNames[(palace - index + base.monthly.index + 12) % 12],
-    );
-
+    // 流月命宮用斗君法、照農曆月份數（iztro 原本的算法）：
+    // 從流年命宮起正月逆數到生月，再起子時順數到生時得斗君（正月），然後順數到當月。
+    // 干支、四化、流曜則取節氣月的。
     return {
       lunarDate: base.lunarDate,
       age: base.age,
       decadal: base.decadal,
       yearly: base.yearly,
-      monthly: { ...solarTermMonthly, index, palaceNames },
+      monthly: {
+        ...solarTermMonthly,
+        index: base.monthly.index,
+        palaceNames: base.monthly.palaceNames,
+      },
       daily: base.daily,
       hourly: base.hourly,
     };
