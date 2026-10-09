@@ -653,8 +653,8 @@ function ChartView({
   );
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const [pickedTime, setPickedTime] = useState<number | null>(null);
-  // 選到第幾層：0 只看本命，5 看到流時
-  const [depth, setDepth] = useState<number>(LAYERS.length - 1);
+  // 選到第幾層：0 只看本命，5 看到流時；一進來就從流時開始
+  const [depth, setDepth] = useState<number>(LAYERS.length);
   const [selected, setSelected] = useState<number | null>(null);
 
   const date = pickedDate ?? today;
