@@ -120,6 +120,8 @@ const HIDDEN_STARS = new Set([
   "年解",
 ]);
 
+// 流曜名稱的第一個字，依層次由外而內
+const LAYER_PREFIXES = "運流月日時";
 // 各層的祿、羊、陀另外放在格子右下
 const CORNER_FLOW_STARS = "祿羊陀";
 // 本命的擎羊、火星、鈴星用紅色，祿存用綠色，陀羅用藍色
@@ -526,56 +528,72 @@ function PalaceCell({
             />
           ))}
         </div>
-        {/* 雜曜只在較寬的畫面顯示，手機上省略；本命的紅鸞、天喜例外，
-            用酒紅框線標出來，手機上也看得到 */}
-        <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] text-ink-soft @2xl:text-xs @5xl:text-[13px] @5xl:leading-[1.15]">
+        {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜另外放到右下 */}
+        <div className="hidden flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-ink-soft @2xl:flex @5xl:text-[13px] @5xl:leading-[1.15]">
           {palace.adjectiveStars
-            .filter((star) => !HIDDEN_STARS.has(star.name))
+            .filter(
+              (star) => !HIDDEN_STARS.has(star.name) && !HIGHLIGHT_NATAL_STARS.has(star.name),
+            )
             .map((star) => (
-              <StarLabel
-                key={star.name}
-                star={star}
-                className={
-                  HIGHLIGHT_NATAL_STARS.has(star.name)
-                    ? "inline-flex rounded-[3px] border border-wine px-px py-0.5 font-medium text-wine"
-                    : "hidden @2xl:inline-flex"
-                }
-              />
+              <StarLabel key={star.name} star={star} />
             ))}
         </div>
         {/* 運限帶進來的其他流曜 */}
         <div className={FLOW_ROW}>
           {flowStars
-            .filter((star) => !CORNER_FLOW_STARS.includes(star.name[1]))
+            .filter(
+              (star) =>
+                !CORNER_FLOW_STARS.includes(star.name[1]) &&
+                !HIGHLIGHT_FLOW_STARS.includes(star.name[1]),
+            )
             .map((star) => (
-              <span
-                key={star.name}
-                className={`${FLOW_STAR} ${
-                  HIGHLIGHT_FLOW_STARS.includes(star.name[1])
-                    ? `rounded-[3px] py-0.5 text-paper-light ${
-                        star.name[0] === "流" ? "bg-wine" : "bg-orchid"
-                      }`
-                    : star.text
-                }`}
-              >
+              <span key={star.name} className={`${FLOW_STAR} ${star.text}`}>
                 {star.name}
               </span>
             ))}
         </div>
       </div>
 
-      {/* 各層的祿、羊、陀靠右、偏下，貼在宮位資訊上方 */}
-      <div className={`mt-auto justify-end px-1.5 pb-1 @5xl:px-3 @5xl:pb-2 ${FLOW_ROW}`}>
-        {flowStars
-          .filter((star) => CORNER_FLOW_STARS.includes(star.name[1]))
-          .map((star) => (
-            <span
-              key={star.name}
-              className={`${FLOW_STAR} font-medium ${FLOW_STAR_COLORS[star.name[1]] ?? star.text}`}
-            >
-              {star.name}
-            </span>
-          ))}
+      {/* 右下角固定兩排：上排是鸞喜（本命、大限、流年、流月、流日、流時），
+          下排是各層的祿、羊、陀。下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
+      <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:px-3 @5xl:pb-2">
+        <div className={`justify-end ${FLOW_ROW}`}>
+          {palace.adjectiveStars
+            .filter((star) => HIGHLIGHT_NATAL_STARS.has(star.name))
+            .map((star) => (
+              <span
+                key={star.name}
+                className={`${FLOW_STAR} rounded-[3px] border border-wine py-0.5 font-medium text-wine`}
+              >
+                {star.name}
+              </span>
+            ))}
+          {flowStars
+            .filter((star) => HIGHLIGHT_FLOW_STARS.includes(star.name[1]))
+            .sort((a, b) => LAYER_PREFIXES.indexOf(a.name[0]) - LAYER_PREFIXES.indexOf(b.name[0]))
+            .map((star) => (
+              <span
+                key={star.name}
+                className={`${FLOW_STAR} rounded-[3px] py-0.5 text-paper-light ${
+                  star.name[0] === "流" ? "bg-wine" : "bg-orchid"
+                }`}
+              >
+                {star.name}
+              </span>
+            ))}
+        </div>
+        <div className={`min-h-[2.3em] justify-end ${FLOW_ROW}`}>
+          {flowStars
+            .filter((star) => CORNER_FLOW_STARS.includes(star.name[1]))
+            .map((star) => (
+              <span
+                key={star.name}
+                className={`${FLOW_STAR} font-medium ${FLOW_STAR_COLORS[star.name[1]] ?? star.text}`}
+              >
+                {star.name}
+              </span>
+            ))}
+        </div>
       </div>
 
       {/* 宮位資訊：用淡米色底和上方的星曜區隔開 */}
