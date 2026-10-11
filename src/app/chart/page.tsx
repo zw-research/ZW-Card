@@ -993,6 +993,17 @@ function ChartView({
     ["身主", chart.body],
     ["生肖", chart.zodiac],
   ];
+  // 選了運限層次時，中央另外列出所看的日期；看到流時才列時辰
+  const flowFacts =
+    depth > 0 && horoscope
+      ? [
+          ["國曆", date.split("-").map(Number).join("-")],
+          ["農曆", horoscope.lunarDate],
+          ...(depth === LAYERS.length ? [["時辰", TIMES[timeIndex].split(" ")[0]]] : []),
+        ]
+      : [];
+  const FACT_LIST =
+    "grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-[11px] leading-4 @2xl:gap-x-3 @2xl:text-sm @2xl:leading-5 @5xl:gap-x-5 @5xl:gap-y-1.5 @5xl:text-base @5xl:leading-6";
 
   return (
     <div className="flex flex-col gap-4">
@@ -1189,7 +1200,7 @@ function ChartView({
               {chart.gender}
             </span>
           </p>
-          <dl className="grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-[11px] leading-4 @2xl:gap-x-3 @2xl:text-sm @2xl:leading-5 @5xl:gap-x-5 @5xl:gap-y-1.5 @5xl:text-base @5xl:leading-6">
+          <dl className={FACT_LIST}>
             {facts.map(([label, value]) => (
               <div key={label} className="contents">
                 <dt className="text-ink-soft">{label}</dt>
@@ -1197,6 +1208,24 @@ function ChartView({
               </div>
             ))}
           </dl>
+          {/* 所看的運限時間：標上選到的層次，和上面的出生資料用一條線隔開 */}
+          {flowFacts.length > 0 && (
+            <div className="flex flex-col items-center gap-1 border-t border-line pt-2 @5xl:gap-2 @5xl:pt-4">
+              <span
+                className={`rounded-full px-2 text-[11px] leading-4 text-paper-light @2xl:text-xs @2xl:leading-5 ${LAYERS[depth - 1].badge}`}
+              >
+                {LAYERS[depth - 1].label}
+              </span>
+              <dl className={FACT_LIST}>
+                {flowFacts.map(([label, value]) => (
+                  <div key={label} className="contents">
+                    <dt className="text-ink-soft">{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
           <button
             type="button"
             onClick={onEdit}
