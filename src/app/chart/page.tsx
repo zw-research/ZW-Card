@@ -989,19 +989,37 @@ function ChartView({
     ["干支", chart.chineseDate],
     ["時辰", chart.time],
     ["五行", chart.fiveElementsClass],
-    ["命主", chart.soul],
-    ["身主", chart.body],
     ["生肖", chart.zodiac],
   ];
-  // 選了運限層次時，中央另外列出所看的日期；看到流時才列時辰
-  const flowFacts =
-    depth > 0 && horoscope
-      ? [
-          ["國曆", date.split("-").map(Number).join("-")],
-          ["農曆", horoscope.lunarDate],
-          ...(depth === LAYERS.length ? [["時辰", TIMES[timeIndex].split(" ")[0]]] : []),
-        ]
-      : [];
+  // 選了運限層次時，中央另外列出所看的時間，只寫到所選層次的精細度：
+  // 大限是起訖年，流年是那一年，流月到月，流日到日，流時再加時辰。
+  // 大限和流年都在正月初一換，所以年份是農曆年。
+  function getFlowFacts(): string[][] {
+    if (depth === 0 || !horoscope) return [];
+    const birthYear = chart.rawDates.lunarDate.lunarYear;
+    if (depth === 1) {
+      const [start, end] = chart.palaces[horoscope.decadal.index].decadal.range;
+      // 起運前借最後一個大限的宮位來看，年份則是出生那年到起運的前一年
+      const firstStart = Math.min(...chart.palaces.map((palace) => palace.decadal.range[0]));
+      const [from, to] = horoscope.realAge < firstStart ? [0, firstStart - 1] : [start, end];
+      return [["年份", `${birthYear + from}–${birthYear + to}`]];
+    }
+    if (depth === 2) return [["年份", String(birthYear + horoscope.realAge)]];
+    const [year, month, day] = date.split("-").map(Number);
+    const lunarMonthEnd = horoscope.lunarDate.indexOf("月") + 1;
+    if (depth === 3) {
+      return [
+        ["國曆", `${year}-${month}`],
+        ["農曆", horoscope.lunarDate.slice(0, lunarMonthEnd)],
+      ];
+    }
+    return [
+      ["國曆", `${year}-${month}-${day}`],
+      ["農曆", horoscope.lunarDate],
+      ...(depth === LAYERS.length ? [["時辰", TIMES[timeIndex].split(" ")[0]]] : []),
+    ];
+  }
+  const flowFacts = getFlowFacts();
   const FACT_LIST =
     "grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5 text-left text-[11px] leading-4 @2xl:gap-x-3 @2xl:text-sm @2xl:leading-5 @5xl:gap-x-5 @5xl:gap-y-1.5 @5xl:text-base @5xl:leading-6";
 
