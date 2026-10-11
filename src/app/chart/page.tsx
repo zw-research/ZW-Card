@@ -119,6 +119,16 @@ const LAYERS = [
   { key: "hourly", label: "流時", short: "時", badge: "bg-gold-deep", text: "text-gold-deep" },
 ] as const;
 
+// 小限不在上面的層次裡，另外用開關疊上去：一年一宮，照虛歲算，只有宮名和四化，沒有流曜。
+// 其他層次用實心色塊，小限一律只畫框線。
+const AGE_LAYER = {
+  key: "age",
+  label: "小限",
+  short: "小",
+  text: "text-apricot-deep",
+  outline: "ring-1 ring-inset ring-apricot-deep text-apricot-deep",
+} as const;
+
 // 盤面一次最多疊幾層運限，取最靠近所選層次的幾層
 const VISIBLE_LAYERS = 3;
 
@@ -164,9 +174,13 @@ type Horoscope = Pick<
   ReturnType<Astrolabe["horoscope"]>,
   "lunarDate" | "age" | "decadal" | "yearly" | "monthly" | "daily" | "hourly"
 > & { realAge: number };
-type Layer = (typeof LAYERS)[number];
+type FlowLayer = (typeof LAYERS)[number];
+type Layer = FlowLayer | typeof AGE_LAYER;
 // 某個層次套在盤上的結果
-type ActiveLayer = { layer: Layer; item: Horoscope[Layer["key"]] };
+type ActiveLayer = {
+  layer: Layer;
+  item: Horoscope[FlowLayer["key"]] | (Horoscope["age"] & { stars?: undefined });
+};
 
 // 晚子時，一天裡最後一個時辰
 const LAST_TIME_INDEX = 12;
@@ -259,7 +273,7 @@ function shiftYear(date: string, years: number) {
 // 回傳要改成的日期或時辰；找不到就回傳 null。
 function findTimeForPalace(
   chart: Astrolabe,
-  layerKey: Layer["key"],
+  layerKey: FlowLayer["key"],
   palace: number,
   date: string,
   timeIndex: number,
@@ -311,7 +325,7 @@ const MUTAGEN_STYLES = [
 ];
 
 // 星名直書，下方是四化（不顯示廟旺平陷）。
-// 四化依層級順序排：本命、大限、流年、流月……
+// 四化依層級順序排：本命、大限、小限、流年、流月……
 // 某一層沒有四化時不留空，下面的層級直接往上遞補。
 function StarLabel({
   star,
@@ -333,10 +347,16 @@ function StarLabel({
 
   // 每一格是祿權科忌的第幾個；沒有四化的層級（-1）直接略過
   const used = [
-    { label: "本命", natal: true, index: MUTAGEN_NAMES.indexOf(star.mutagen ?? "") },
+    {
+      label: "本命",
+      natal: true,
+      dashed: false,
+      index: MUTAGEN_NAMES.indexOf(star.mutagen ?? ""),
+    },
     ...layers.map(({ layer, item }) => ({
       label: layer.label,
       natal: false,
+      dashed: layer.key === "age",
       index: item.mutagen.indexOf(star.name),
     })),
   ].filter((slot) => slot.index >= 0);
@@ -359,8 +379,13 @@ function StarLabel({
         <span
           key={slot.label}
           title={`${slot.label}化${MUTAGEN_NAMES[slot.index]}`}
+          // 小限的四化也只畫框，用虛線和本命的實線框區分
           className={`${BADGE} ${
-            slot.natal ? MUTAGEN_STYLES[slot.index].outline : MUTAGEN_STYLES[slot.index].fill
+            slot.dashed
+              ? `${MUTAGEN_STYLES[slot.index].outline} border-dashed`
+              : slot.natal
+                ? MUTAGEN_STYLES[slot.index].outline
+                : MUTAGEN_STYLES[slot.index].fill
           }`}
         >
           {MUTAGEN_NAMES[slot.index]}
@@ -605,19 +630,27 @@ function PalaceCell({
   const FLOW_ROW =
     "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] @2xl:text-xs @5xl:text-[15px] @5xl:leading-[1.15]";
   const FLOW_STAR = "whitespace-nowrap [writing-mode:vertical-rl]";
-  // 這一宮在某層運限中的宮名小標；是該運限的命宮時填滿底色
+  // 這一宮在某層運限中的宮名小標；是該運限的命宮時填滿底色（小限是畫框）
   const layerChip = (layer: Layer, item: ActiveLayer["item"]) =>
     `rounded text-center whitespace-nowrap ${
-      item.index === palace.index
-        ? `${layer.badge} text-paper-light`
-        : `bg-paper-light ${layer.text}`
+      item.index !== palace.index
+        ? `bg-paper-light ${layer.text}`
+        : layer.key === "age"
+          ? `bg-paper-light ${layer.outline}`
+          : `${layer.badge} text-paper-light`
     }`;
   // 超過三層時小標只寫宮名一個字，不寫「限年月日時」，是哪一層看顏色
   const compactChips = chipLayers.length > 3;
   const chipLabel = (layer: Layer, item: ActiveLayer["item"]) =>
     (compactChips ? "" : layer.short) + item.palaceNames[palace.index][0];
   // 電腦版把選到的每一層宮名都排在同一列
-  const inlineChipSize = compactChips ? "w-6 text-[15px] leading-6" : "w-9 text-[15px] leading-6";
+  // 五層再加小限共六個時再窄一點，才排得進去
+  const inlineChipSize =
+    chipLayers.length > 5
+      ? "w-5 text-[15px] leading-6"
+      : compactChips
+        ? "w-6 text-[15px] leading-6"
+        : "w-9 text-[15px] leading-6";
   return (
     <div
       style={{ gridRow: row, gridColumn: column }}
@@ -869,6 +902,7 @@ function ChartView({
   // 選到第幾層：0 只看本命，5 看到流時；一進來就從流時開始
   const [depth, setDepth] = useState<number>(LAYERS.length);
   const [selected, setSelected] = useState<number | null>(null);
+  const [showAge, setShowAge] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const fit = useFitToScreen(gridRef);
 
@@ -888,9 +922,18 @@ function ChartView({
   const CONTROL_INPUT = `rounded-lg border border-line bg-paper-light px-1.5 py-1.5 text-xs sm:px-4 sm:py-2.5 sm:text-base ${FOCUS}`;
   // 三方四正：本宮、對宮與兩個三合宮
   // 選到的每一層（不只盤上疊的三層），用來列出各層的宮名和四化
-  const chipLayers: ActiveLayer[] = horoscope
+  const flowChipLayers: ActiveLayer[] = horoscope
     ? LAYERS.slice(0, depth).map((layer) => ({ layer, item: horoscope[layer.key] }))
     : [];
+  // 小限開著時排在大限後面、流年前面；只看本命時也可以單獨疊小限
+  const chipLayers: ActiveLayer[] =
+    horoscope && showAge
+      ? [
+          ...flowChipLayers.slice(0, 1),
+          { layer: AGE_LAYER, item: horoscope.age },
+          ...flowChipLayers.slice(1),
+        ]
+      : flowChipLayers;
 
   // 大限和流年的鸞喜一直顯示：盤上只疊最近的三層，這兩層沒被疊上去時，鸞喜另外補上
   const pinned: ActiveLayer[] = horoscope
@@ -1037,12 +1080,26 @@ function ChartView({
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            aria-pressed={showAge}
+            onClick={() => setShowAge(!showAge)}
+            className={`rounded-full border px-4 py-2 text-xs transition-colors sm:text-sm ${FOCUS} ${
+              showAge
+                ? `border-apricot-deep ${AGE_LAYER.text}`
+                : "border-line hover:bg-paper"
+            }`}
+          >
+            {AGE_LAYER.label}
+          </button>
         </div>
 
         {horoscope ? (
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="text-ink-soft">
               農曆 {horoscope.lunarDate}・實歲 {horoscope.realAge}
+              {showAge && `・虛歲 ${horoscope.age.nominalAge}`}
             </span>
             <span
               className={`rounded-full px-2 text-xs leading-5 ${NATAL_BADGE}`}
@@ -1052,7 +1109,9 @@ function ChartView({
             {chipLayers.map(({ layer, item }) => (
               <span key={layer.key} className="flex items-center gap-1.5">
                 <span
-                  className={`rounded-full px-2 text-xs leading-5 text-paper-light ${layer.badge}`}
+                  className={`rounded-full px-2 text-xs leading-5 ${
+                    layer.key === "age" ? layer.outline : `text-paper-light ${layer.badge}`
+                  }`}
                 >
                   {layer.label}
                 </span>
