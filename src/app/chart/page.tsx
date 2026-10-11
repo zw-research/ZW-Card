@@ -163,7 +163,7 @@ const HIGHLIGHT_FLOW_STARS = "鸞喜";
 type Horoscope = Pick<
   ReturnType<Astrolabe["horoscope"]>,
   "lunarDate" | "age" | "decadal" | "yearly" | "monthly" | "daily" | "hourly"
->;
+> & { realAge: number };
 type Layer = (typeof LAYERS)[number];
 // 某個層次套在盤上的結果
 type ActiveLayer = { layer: Layer; item: Horoscope[Layer["key"]] };
@@ -172,6 +172,8 @@ type ActiveLayer = { layer: Layer; item: Horoscope[Layer["key"]] };
 const LAST_TIME_INDEX = 12;
 
 // 指定日期與時辰的大限、流年、流月、流日、流時。
+// 大限照實歲換（iztro 原本照虛歲）：實歲是當年會滿的歲數，也就是虛歲減一，
+// 和流年同一天（正月初一）換，所以每個大限都比虛歲的算法晚一年。
 // 流月的干支與四化照農民曆的節氣月（節氣交接換月），流月命宮則用斗君法照農曆月份排。
 function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horoscope | null {
   const [year, month, day] = date.split("-").map(Number);
@@ -179,6 +181,21 @@ function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horosc
   const target = `${year}-${month}-${day}`;
   try {
     const base = chart.horoscope(target, timeIndex);
+
+    // iztro 的大限只認虛歲，所以改拿「虛歲等於指定歲數」的那一年來取大限。
+    // 年中的日期一定落在同一個農曆年裡，那年的虛歲是 midYearAge，往前推差額就是要的年份。
+    const realAge = base.age.nominalAge - 1;
+    const midYearAge = chart.horoscope(`${year}-7-1`, timeIndex).age.nominalAge;
+    const decadalAt = (age: number) =>
+      chart.horoscope(`${year - midYearAge + age}-7-1`, timeIndex).decadal;
+
+    // 起運前（童限）看第一個大限的前一宮，也就是歲數排到最後、一百多歲的那個大限；
+    // 內容借那一宮的大限來用，名稱標成童限（虛歲 1 歲一定還沒起運，名稱從那裡取）。
+    const starts = chart.palaces.map((palace) => palace.decadal.range[0]);
+    const decadal =
+      realAge >= Math.min(...starts)
+        ? decadalAt(realAge)
+        : { ...decadalAt(Math.max(...starts)), name: decadalAt(1).name };
 
     // iztro 預設用農曆初一換月；暫時切到節氣分界，取出節氣月的干支、四化與流曜。
     // 交節那一天整天都算新的月份（和農民曆上標的日期一致），不看交節的時刻，
@@ -197,7 +214,8 @@ function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horosc
     return {
       lunarDate: base.lunarDate,
       age: base.age,
-      decadal: base.decadal,
+      realAge,
+      decadal,
       yearly: base.yearly,
       monthly: {
         ...solarTermMonthly,
@@ -261,7 +279,10 @@ function findTimeForPalace(
     if (!current) return null;
     if (current.decadal.index === palace) return { date };
     const startAge = chart.palaces[palace].decadal.range[0];
-    return { date: shiftYear(date, startAge - current.age.nominalAge) };
+    const shifted = shiftYear(date, startAge - current.realAge);
+    // 農曆年初每年日期不同，年初的日期平移後可能還落在前一個農曆年，那就再往後一個月
+    if (getHoroscope(chart, shifted, timeIndex)?.decadal.index === palace) return { date: shifted };
+    return { date: shiftDate(shifted, 31) };
   }
 
   // 每一步跨多少、最多找幾步：流日一天一宮；流月每七天看一次一定會落在每個月裡；流年一年一宮
@@ -1021,7 +1042,7 @@ function ChartView({
         {horoscope ? (
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="text-ink-soft">
-              農曆 {horoscope.lunarDate}・虛歲 {horoscope.age.nominalAge}
+              農曆 {horoscope.lunarDate}・實歲 {horoscope.realAge}
             </span>
             <span
               className={`rounded-full px-2 text-xs leading-5 ${NATAL_BADGE}`}
