@@ -163,8 +163,13 @@ const FLOW_STAR_COLORS: Record<string, string> = {
   祿: "text-star-green",
   陀: "text-star-red",
 };
-// 手機上也要顯示的本命星：雜曜裡的陰煞、蜚廉，和將前十二神的指背
-const ALWAYS_SHOWN_STARS = new Set<string>(["陰煞", "蜚廉", "指背"]);
+// 手機上也要顯示的本命星：雜曜裡的陰煞、蜚廉、天貴、天德，將前十二神的指背，
+// 歲前十二神的龍德，博士十二神的伏兵
+// （iztro 的天德依年支安，和歲前十二神的天德同宮，只取雜曜那一顆）
+const ALWAYS_SHOWN_STARS = new Set<string>(["陰煞", "蜚廉", "天貴", "天德", "指背", "龍德", "伏兵"]);
+// 吉星天貴、天德、龍德用藍色，和其他右下角的星區分
+const BLUE_STARS = new Set<string>(["天貴", "天德", "龍德"]);
+const cornerStarColor = (name: string) => (BLUE_STARS.has(name) ? "text-star-blue" : "text-ink");
 // 本命的紅鸞、天喜用酒紅框線標出
 const HIGHLIGHT_NATAL_STARS = new Set(["紅鸞", "天喜"]);
 // 運限的鸞、喜用底色塊突顯：流年的是酒紅，大限的是粉紫（流月、流日、流時的不顯示）
@@ -242,6 +247,38 @@ function getHoroscope(chart: Astrolabe, date: string, timeIndex: number): Horosc
   } catch {
     return null;
   }
+}
+
+// 手機上是否顯示全部雜曜；存在 localStorage，存不了時只記在這次開啟的頁面
+const ADJECTIVE_KEY = "practice1.chart-adjective";
+const ADJECTIVE_EVENT = "practice1:chart-adjective";
+let adjectiveFallback = false;
+
+function subscribeAdjective(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener(ADJECTIVE_EVENT, listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener(ADJECTIVE_EVENT, listener);
+  };
+}
+
+function getAdjective() {
+  try {
+    return localStorage.getItem(ADJECTIVE_KEY) === "1";
+  } catch {
+    return adjectiveFallback;
+  }
+}
+
+function setAdjective(value: boolean) {
+  adjectiveFallback = value;
+  try {
+    localStorage.setItem(ADJECTIVE_KEY, value ? "1" : "0");
+  } catch {
+    // 用上面的 adjectiveFallback
+  }
+  window.dispatchEvent(new Event(ADJECTIVE_EVENT));
 }
 
 // 現在是哪個時辰；23 點起算晚子時
@@ -599,8 +636,11 @@ function PalaceCell({
   pinned,
   chipLayers,
   flying,
+  showAdjective,
   onSelect,
 }: {
+  // 手機上也顯示全部雜曜（較寬的畫面本來就會顯示）
+  showAdjective: boolean;
   palace: Palace;
   state: "selected" | "related" | "none";
   layers: ActiveLayer[];
@@ -690,7 +730,7 @@ function PalaceCell({
                 !ALWAYS_SHOWN_STARS.has(star.name),
             )
             .map((star) => (
-              <StarLabel key={star.name} star={star} className="hidden @2xl:inline-flex" />
+              <StarLabel key={star.name} star={star} className={showAdjective ? "inline-flex" : "hidden @2xl:inline-flex"} />
             ))}
         </div>
         {/* 運限帶進來的其他流曜 */}
@@ -718,12 +758,18 @@ function PalaceCell({
           {palace.adjectiveStars
             .filter((star) => ALWAYS_SHOWN_STARS.has(star.name))
             .map((star) => (
-              <span key={star.name} className={`${FLOW_STAR} font-medium text-ink`}>
+              <span key={star.name} className={`${FLOW_STAR} font-medium ${cornerStarColor(star.name)}`}>
                 {star.name}
               </span>
             ))}
           {ALWAYS_SHOWN_STARS.has(palace.jiangqian12) && (
             <span className={`${FLOW_STAR} font-medium text-ink`}>{palace.jiangqian12}</span>
+          )}
+          {palace.boshi12 === "伏兵" && (
+            <span className={`${FLOW_STAR} font-medium text-ink`}>{palace.boshi12}</span>
+          )}
+          {palace.suiqian12 === "龍德" && (
+            <span className={`${FLOW_STAR} font-medium text-star-blue`}>{palace.suiqian12}</span>
           )}
           {palace.adjectiveStars
             .filter((star) => HIGHLIGHT_NATAL_STARS.has(star.name))
@@ -903,6 +949,11 @@ function ChartView({
   const [depth, setDepth] = useState<number>(LAYERS.length);
   const [selected, setSelected] = useState<number | null>(null);
   const [showAge, setShowAge] = useState(false);
+  // 雜曜開關：手機上預設不顯示雜曜，按了才顯示；記在這個瀏覽器
+  const showAdjective = useSyncExternalStore(subscribeAdjective, getAdjective, () => false);
+  function toggleAdjective() {
+    setAdjective(!showAdjective);
+  }
   const gridRef = useRef<HTMLDivElement>(null);
   const fit = useFitToScreen(gridRef);
 
@@ -1122,6 +1173,17 @@ function ChartView({
           >
             {AGE_LAYER.label}
           </button>
+          {/* 較寬的畫面本來就顯示雜曜，開關只在手機出現 */}
+          <button
+            type="button"
+            aria-pressed={showAdjective}
+            onClick={toggleAdjective}
+            className={`rounded-full border px-4 py-2 text-xs transition-colors sm:text-sm md:hidden ${FOCUS} ${
+              showAdjective ? "border-ink bg-ink text-paper-light" : "border-line hover:bg-paper"
+            }`}
+          >
+            雜曜
+          </button>
         </div>
 
         {horoscope ? (
@@ -1195,6 +1257,7 @@ function ChartView({
             pinned={pinned}
             chipLayers={chipLayers}
             flying={flying}
+            showAdjective={showAdjective}
             state={
               focus === palace.index
                 ? "selected"
