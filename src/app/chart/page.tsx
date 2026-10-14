@@ -281,6 +281,38 @@ function setAdjective(value: boolean) {
   window.dispatchEvent(new Event(ADJECTIVE_EVENT));
 }
 
+// 是否只列所選層最近的三層；存法和雜曜開關相同
+const NEAR_KEY = "practice1.chart-near";
+const NEAR_EVENT = "practice1:chart-near";
+let nearFallback = false;
+
+function subscribeNear(listener: () => void) {
+  window.addEventListener("storage", listener);
+  window.addEventListener(NEAR_EVENT, listener);
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener(NEAR_EVENT, listener);
+  };
+}
+
+function getNear() {
+  try {
+    return localStorage.getItem(NEAR_KEY) === "1";
+  } catch {
+    return nearFallback;
+  }
+}
+
+function setNear(value: boolean) {
+  nearFallback = value;
+  try {
+    localStorage.setItem(NEAR_KEY, value ? "1" : "0");
+  } catch {
+    // 用上面的 nearFallback
+  }
+  window.dispatchEvent(new Event(NEAR_EVENT));
+}
+
 // 現在是哪個時辰；23 點起算晚子時
 const subscribeNever = () => () => {};
 
@@ -954,6 +986,8 @@ function ChartView({
   function toggleAdjective() {
     setAdjective(!showAdjective);
   }
+  // 近三層開關：只列所選層最近的三層；記在這個瀏覽器
+  const nearOnly = useSyncExternalStore(subscribeNear, getNear, () => false);
   const gridRef = useRef<HTMLDivElement>(null);
   const fit = useFitToScreen(gridRef);
 
@@ -973,16 +1007,21 @@ function ChartView({
   const CONTROL_INPUT = `rounded-lg border border-line bg-paper-light px-1.5 py-1.5 text-xs sm:px-4 sm:py-2.5 sm:text-base ${FOCUS}`;
   // 三方四正：本宮、對宮與兩個三合宮
   // 選到的每一層（不只盤上疊的三層），用來列出各層的宮名和四化
+  // 「近三層」開著時只列所選層往外數的三層，所選的那層排最後
   const flowChipLayers: ActiveLayer[] = horoscope
-    ? LAYERS.slice(0, depth).map((layer) => ({ layer, item: horoscope[layer.key] }))
+    ? LAYERS.slice(nearOnly ? Math.max(0, depth - VISIBLE_LAYERS) : 0, depth).map((layer) => ({
+        layer,
+        item: horoscope[layer.key],
+      }))
     : [];
-  // 小限開著時排在大限後面、流年前面；只看本命時也可以單獨疊小限
+  // 小限開著時排在大限後面、流年前面；大限不在列表裡時排最前面；只看本命時也可以單獨疊小限
+  const ageAt = flowChipLayers[0]?.layer.key === "decadal" ? 1 : 0;
   const chipLayers: ActiveLayer[] =
     horoscope && showAge
       ? [
-          ...flowChipLayers.slice(0, 1),
+          ...flowChipLayers.slice(0, ageAt),
           { layer: AGE_LAYER, item: horoscope.age },
-          ...flowChipLayers.slice(1),
+          ...flowChipLayers.slice(ageAt),
         ]
       : flowChipLayers;
 
@@ -1172,6 +1211,16 @@ function ChartView({
             }`}
           >
             {AGE_LAYER.label}
+          </button>
+          <button
+            type="button"
+            aria-pressed={nearOnly}
+            onClick={() => setNear(!nearOnly)}
+            className={`rounded-full border px-4 py-2 text-xs transition-colors sm:text-sm ${FOCUS} ${
+              nearOnly ? "border-ink bg-ink text-paper-light" : "border-line hover:bg-paper"
+            }`}
+          >
+            近三層
           </button>
           {/* 較寬的畫面本來就顯示雜曜，開關只在手機出現 */}
           <button
