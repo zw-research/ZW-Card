@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { HomeLink } from "./ui";
 
 export const metadata: Metadata = {
-  title: "每日牌卡討論",
-  description: "紫微斗數每日牌卡的討論札記",
+  title: "紫微命盤",
+  description: "紫微斗數個人命盤",
 };
-
-const NAV_PILL =
-  "rounded-full px-3 py-2 text-xs tracking-[0.08em] whitespace-nowrap transition-colors sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.12em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -27,34 +23,25 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <header>
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
-            <HomeLink className="flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">
+            <Link
+              href="/"
+              className="flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
+            >
               <svg aria-hidden viewBox="0 0 36 36" className="h-9 w-9">
                 <circle cx="18" cy="18" r="16" className="fill-ink" />
                 <circle cx="21" cy="15" r="8" className="fill-paper-light" />
                 <circle cx="24" cy="12" r="4" className="fill-gold" />
               </svg>
-              <span className="text-xl font-medium tracking-[0.12em]">每日牌卡討論</span>
+              <span className="text-xl font-medium tracking-[0.12em]">紫微命盤</span>
               <span className="hidden font-display text-[10px] leading-tight tracking-[0.15em] sm:block">
-                DAILY CARD
+                ZI WEI
                 <br />
-                NOTES
+                CHART
               </span>
-            </HomeLink>
-            <nav aria-label="主選單" className="flex gap-1.5 sm:gap-3">
-              <HomeLink className={`${NAV_PILL} bg-paper hover:bg-line`}>每日三牌</HomeLink>
-              <Link href="/chart" className={`${NAV_PILL} bg-paper hover:bg-line`}>
-                命盤
-              </Link>
-              <Link href="/card" className={`${NAV_PILL} bg-paper hover:bg-line`}>
-                星曜連結
-              </Link>
-              <Link href="/backup" className={`${NAV_PILL} bg-paper hover:bg-line`}>
-                備份
-              </Link>
-            </nav>
+            </Link>
           </div>
           <p className="bg-paper px-4 py-2.5 text-center text-xs tracking-[0.12em] text-ink-soft">
-            紫微斗數・主星、輔星、長生的每日三牌札記
+            紫微斗數・個人命盤
           </p>
         </header>
         {children}
