@@ -63,8 +63,6 @@ const POSITIONS = [
   [4, 2],
 ];
 
-// 上方圖例裡「本命」標籤的樣式：只畫框
-const NATAL_BADGE = "border border-ink text-ink";
 
 function buildChart(profile: ChartProfile): Astrolabe | null {
   const date = `${profile.year}-${profile.month}-${profile.day}`;
@@ -1223,30 +1221,11 @@ function ChartView({
           </button>
         </div>
 
+        {/* 各層的干支移到命盤中央最下面，這裡只留農曆與歲數 */}
         {horoscope ? (
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <span className="text-ink-soft">
-              農曆 {horoscope.lunarDate}・實歲 {horoscope.realAge}
-              {showAge && `・虛歲 ${horoscope.age.nominalAge}`}
-            </span>
-            <span
-              className={`rounded-full px-2 text-xs leading-5 ${NATAL_BADGE}`}
-            >
-              本命
-            </span>
-            {chipLayers.map(({ layer, item }) => (
-              <span key={layer.key} className="flex items-center gap-1.5">
-                <span
-                  className={`rounded-full px-2 text-xs leading-5 ${
-                    layer.key === "age" ? layer.outline : `text-paper-light ${layer.badge}`
-                  }`}
-                >
-                  {layer.label}
-                </span>
-                {item.heavenlyStem}
-                {item.earthlyBranch}
-              </span>
-            ))}
+          <p className="text-sm text-ink-soft">
+            農曆 {horoscope.lunarDate}・實歲 {horoscope.realAge}
+            {showAge && `・虛歲 ${horoscope.age.nominalAge}`}
           </p>
         ) : (
           <p className="text-sm text-ink-soft">請選擇日期。</p>
@@ -1351,6 +1330,25 @@ function ChartView({
           >
             修改出生資料
           </button>
+          {/* 各層四化的天干（連地支）：放在中央最下面，和上面用一條線隔開 */}
+          {horoscope && chipLayers.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 border-t border-line pt-2 text-[11px] leading-4 @2xl:gap-x-3 @2xl:text-sm @2xl:leading-5 @5xl:pt-4 @5xl:text-base">
+              {chipLayers.map(({ layer, item }) => (
+                <span key={layer.key} className="flex items-center gap-0.5 whitespace-nowrap @2xl:gap-1">
+                  <span
+                    className={`rounded-full px-1 text-[10px] leading-4 @2xl:px-2 @2xl:text-xs @2xl:leading-5 ${
+                      layer.key === "age" ? layer.outline : `text-paper-light ${layer.badge}`
+                    }`}
+                  >
+                    <span className="@2xl:hidden">{layer.short}</span>
+                    <span className="hidden @2xl:inline">{layer.label}</span>
+                  </span>
+                  {item.heavenlyStem}
+                  {item.earthlyBranch}
+                </span>
+              ))}
+            </div>
+          )}
           </div>
         </div>
       </div>
