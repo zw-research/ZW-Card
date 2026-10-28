@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { isReversed, orientMark } from "./cards";
 import { cardFull, cardThumb } from "./cardImages";
 import { FOCUS } from "./ui";
 
@@ -24,7 +25,8 @@ const GAP = 2; // 宮與宮之間
 const PAIR_GAP = 1; // 同宮兩張牌之間
 const MARGIN = 18; // 中央兩張牌四周留給宮名的空白
 
-const label = (c: Card) => `${c.name}（${c.reversed ? "倒" : "正"}）`;
+// 空宮不分正倒，只寫牌名
+const label = (c: Card) => (orientMark(c) ? `${c.name}（${orientMark(c)}）` : c.name);
 
 // 文字盤點牌跳出的大圖
 export function CardZoom({ card, palace, selected, onSelect, onClose }: { card: Card; palace?: string; selected?: boolean; onSelect?: () => void; onClose: () => void }) {
@@ -45,7 +47,7 @@ export function CardZoom({ card, palace, selected, onSelect, onClose }: { card: 
       style={{ paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))" }}
     >
       {src ? (
-        <img src={src} alt={card.name} className={`max-h-[72vh] max-w-[min(88vw,360px)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)] ${card.reversed ? "rotate-180" : ""}`} />
+        <img src={src} alt={card.name} className={`max-h-[72vh] max-w-[min(88vw,360px)] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)] ${isReversed(card) ? "rotate-180" : ""}`} />
       ) : (
         <span className="rounded-xl bg-paper-light px-8 py-12 text-2xl text-ink">{card.name}</span>
       )}
@@ -114,9 +116,9 @@ export function CardGallery({ cells, body, stage, onClose }: { cells: Cell[]; bo
         style={{ width: w, height: Math.round(w * RATIO) }}
       >
         {src ? (
-          <img src={src} alt="" loading="lazy" className={`block h-full w-full object-cover ${c.reversed ? "rotate-180" : ""}`} />
+          <img src={src} alt="" loading="lazy" className={`block h-full w-full object-cover ${isReversed(c) ? "rotate-180" : ""}`} />
         ) : (
-          <span className={`flex h-full items-center justify-center text-[11px] text-ink ${c.reversed ? "rotate-180" : ""}`}>{c.name}</span>
+          <span className={`flex h-full items-center justify-center text-[11px] text-ink ${isReversed(c) ? "rotate-180" : ""}`}>{c.name}</span>
         )}
       </button>
     );
@@ -175,7 +177,7 @@ export function CardGallery({ cells, body, stage, onClose }: { cells: Cell[]; bo
         </div>
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-1.5" style={size.land ? { height: "100%" } : undefined}>
           {big ? (
-            <img src={big} alt={pick.name} className={`max-h-[calc(100%-26px)] max-w-full rounded-[10px] shadow-[0_4px_18px_rgba(40,32,26,0.25)] ${pick.reversed ? "rotate-180" : ""}`} />
+            <img src={big} alt={pick.name} className={`max-h-[calc(100%-26px)] max-w-full rounded-[10px] shadow-[0_4px_18px_rgba(40,32,26,0.25)] ${isReversed(pick) ? "rotate-180" : ""}`} />
           ) : (
             <span className="text-2xl text-ink">{pick.name}</span>
           )}

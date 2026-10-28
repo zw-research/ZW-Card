@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { solar2lunar } from "lunar-lite";
-import { CARD_CATEGORY, CATEGORIES } from "./cards";
+import { CARD_CATEGORY, CATEGORIES, fixOrient, hasOrient, isReversed, orientMark } from "./cards";
 import { explain, normId, type Mcp } from "./cases";
 import { GUA_PALACES, TIMES, toggleBlock } from "./chart";
 import { branchOf, randomIndex, stemOf } from "./draw";
@@ -113,7 +113,8 @@ function shuffle<T>(list: T[]) {
   }
   return copy;
 }
-const flip = (name: string): Card => ({ name, reversed: randomIndex(2) === 1 });
+// 正倒隨機；空宮不分正倒
+const flip = (name: string): Card => fixOrient({ name, reversed: randomIndex(2) === 1 });
 
 // 取數：有手動輸入兩個數就用手動（換算規則和取卦相同：數一 ÷10 定天干、數二 ÷12 定地支），否則電腦隨機
 function deal(kind: Spread["kind"], question: string, year: string, nums: [string, string] | null): Spread {
@@ -145,7 +146,7 @@ function deal(kind: Spread["kind"], question: string, year: string, nums: [strin
 // ---------- 存案例用的文字（牌組欄位）----------
 // 牌陣｜取數丁干｜命宮在未｜問事 2026；命宮丁未：紫貪正｜文昌正；……；身宮：機陰正｜養倒
 // （第一版寫成「丁干」「問事」不帶年份，讀的時候也接受）
-const cardText = (card: Card) => `${card.name}${card.reversed ? "倒" : "正"}`;
+const cardText = (card: Card) => `${card.name}${orientMark(card)}`;
 export function spreadText(s: Spread) {
   return [
     `牌陣｜取數${s.stem}干｜命宮在${s.life}｜${s.kind} ${s.year}`,
@@ -155,8 +156,10 @@ export function spreadText(s: Spread) {
 }
 
 const parseCard = (text: string): Card | null => {
-  const m = text.trim().match(/^(.+?)(正|倒)$/);
-  return m && CARD_CATEGORY.has(m[1]) ? { name: m[1], reversed: m[2] === "倒" } : null;
+  const bare = text.trim();
+  if (CARD_CATEGORY.has(bare) && !hasOrient(bare)) return { name: bare, reversed: false };
+  const m = bare.match(/^(.+?)(正|倒)$/);
+  return m && CARD_CATEGORY.has(m[1]) ? fixOrient({ name: m[1], reversed: m[2] === "倒" }) : null;
 };
 export const isSpreadText = (text: string) => /^牌陣｜/.test((text || "").trim());
 export function parseSpreadText(text: string, extra: { question?: string; at?: string } = {}): Spread | null {
@@ -302,9 +305,9 @@ const POS: Record<string, [number, number]> = {
 // 點牌（onOpen）跳出牌卡大圖；牌在宮格按鈕裡，所以點牌不會同時點選那一宮（點宮名或空白處才點選）
 function MiniCard({ card, tags, yearTags = [], fly = [], big = false, onOpen }: { card: Card; tags: number[]; yearTags?: number[]; fly?: number[]; big?: boolean; onOpen?: () => void }) {
   const sha = SHA.includes(card.name);
-  const face = card.reversed ? "bg-mist-soft border-mist" : "bg-taupe-soft border-taupe";
+  const face = isReversed(card) ? "bg-mist-soft border-mist" : "bg-taupe-soft border-taupe";
   // 四煞、化忌紅字；祿存綠字
-  const ink = sha ? "text-star-red border-star-red" : card.name === "祿存" ? "text-star-green border-star-green" : card.reversed ? "text-mist-deep" : "text-ink";
+  const ink = sha ? "text-star-red border-star-red" : card.name === "祿存" ? "text-star-green border-star-green" : isReversed(card) ? "text-mist-deep" : "text-ink";
   return (
     <span className="flex flex-col items-center gap-1">
       <span
@@ -334,7 +337,7 @@ function MiniCard({ card, tags, yearTags = [], fly = [], big = false, onOpen }: 
         }
       >
         {/* 字一個一個直排；倒牌像實體牌整組轉 180 度（字倒過來、上下順序也顛倒），不另外寫正／倒 */}
-        <span className={`flex flex-col items-center gap-0.5 ${card.reversed ? "rotate-180" : ""}`}>
+        <span className={`flex flex-col items-center gap-0.5 ${isReversed(card) ? "rotate-180" : ""}`}>
           {[...card.name].map((ch, i) => (
             <span key={i}>{ch}</span>
           ))}

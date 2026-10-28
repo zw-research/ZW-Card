@@ -126,7 +126,17 @@ export const SLOTS: { key: SlotKey; label: string; categoryIds: string[] }[] = [
   { key: "stage", label: "長生", categoryIds: ["stage"] },
 ];
 
-export const ALL_CARDS = CATEGORIES.flatMap((category) =>
+// 空宮牌只有外框、上下對稱，沒有正倒（2026/10/28）：抽牌不給倒、手選沒有正倒鈕、文字只寫「空宮」。
+// 舊資料寫成「空宮倒」「空宮正」也照讀，但一律當成不分正倒（不轉 180 度、不標正倒）。
+export const hasOrient = (name: string) => name !== "空宮";
+// 畫面上要不要轉 180 度、用倒牌顏色
+export const isReversed = (card: { name: string; reversed: boolean }) => card.reversed && hasOrient(card.name);
+// 牌名後面接的「正／倒」；空宮是空字串
+export const orientMark = (card: { name: string; reversed: boolean }) => (hasOrient(card.name) ? (card.reversed ? "倒" : "正") : "");
+// 存進資料前把空宮的方向歸零
+export const fixOrient = <T extends { name: string; reversed: boolean }>(card: T): T => (isReversed(card) || !card.reversed ? card : { ...card, reversed: false });
+
+export const ALL_CARDS =CATEGORIES.flatMap((category) =>
   category.groups.flatMap((group) => group.cards),
 );
 

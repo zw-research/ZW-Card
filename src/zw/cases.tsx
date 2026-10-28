@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { cardThumb } from "./cardImages";
 import { CardZoom } from "./cardView";
-import { CARD_CATEGORY, CATEGORIES, SLOTS } from "./cards";
+import { CARD_CATEGORY, CATEGORIES, SLOTS, fixOrient, hasOrient, isReversed, orientMark } from "./cards";
 import { randomIndex } from "./draw";
 import { isSpreadText, parseSpreadText } from "./spread";
 import { starPageUrl } from "./stars";
@@ -246,12 +246,15 @@ const LAYOUTS: { id: LayoutId; name: string; slots: SlotDef[] }[] = [
 ];
 export const layoutOf = (id: LayoutId) => LAYOUTS.find((item) => item.id === id)!;
 export const emptyPicks = (id: LayoutId): Picks => Object.fromEntries(layoutOf(id).slots.map((slot) => [slot.key, null]));
-export const pickText = (pick: Pick) => `${pick.name}${pick.reversed ? "倒" : "正"}`;
+export const pickText = (pick: Pick) => `${pick.name}${orientMark(pick)}`;
 
 function parsePart(part: string): Pick | null {
-  const match = part.trim().match(/^(.+?)\s*[（(]?(正|倒|逆)[）)]?$/);
+  const bare = part.trim();
+  // 空宮不分正倒，只寫「空宮」
+  if (CARD_CATEGORY.has(bare) && !hasOrient(bare)) return { name: bare, reversed: false };
+  const match = bare.match(/^(.+?)\s*[（(]?(正|倒|逆)[）)]?$/);
   if (!match || !CARD_CATEGORY.has(match[1])) return null;
-  return { name: match[1], reversed: match[2] !== "正" };
+  return fixOrient({ name: match[1], reversed: match[2] !== "正" });
 }
 
 // 組與組之間：「；」或換行（Notion 的 <br>、<br />）
@@ -314,7 +317,7 @@ export function cardSetToText({ layout, groups }: CardSet) {
   return groups.map((group) => `${t(group, "main")}｜${t(group, "minor")}｜${t(group, "stage")}`).join("；");
 }
 
-// 隨機取牌：每格依類別抽，正倒也隨機；同一筆案例不重複（某類抽完才重洗）
+// 隨機取牌：每格依類別抽，正倒也隨機（空宮不分正倒）；同一筆案例不重複（某類抽完才重洗）
 function drawCardSet(layout: LayoutId, count: number): CardSet {
   const piles = new Map<string, string[]>();
   const take = (ids: string[]) => {
@@ -328,7 +331,7 @@ function drawCardSet(layout: LayoutId, count: number): CardSet {
   };
   const slots = layoutOf(layout).slots;
   const groups = Array.from({ length: layout === "three" ? Math.max(count, 1) : 1 }, () =>
-    Object.fromEntries(slots.map((slot) => [slot.key, { name: take(slot.categoryIds), reversed: randomIndex(2) === 1 }])),
+    Object.fromEntries(slots.map((slot) => [slot.key, fixOrient({ name: take(slot.categoryIds), reversed: randomIndex(2) === 1 })])),
   );
   return { layout, groups };
 }
@@ -447,7 +450,7 @@ export function CardsPicker({
 
   function pick(name: string) {
     const current = value.groups[groupIndex];
-    const next = { ...current, [slot.key]: { name, reversed: current[slot.key]?.reversed ?? false } };
+    const next = { ...current, [slot.key]: fixOrient({ name, reversed: current[slot.key]?.reversed ?? false }) };
     const groups = value.groups.map((group, i) => (i === groupIndex ? next : group));
     onChange({ ...value, groups });
     for (let g = groupIndex; g < groups.length; g++) {
@@ -549,7 +552,7 @@ export function CardsPicker({
                   >
                     <span className="text-[11px] leading-4 text-ink-soft">{item.label}</span>
                     {thumb ? (
-                      <img src={thumb} alt={card!.name} className={`aspect-[440/800] w-full max-w-[56px] rounded-[3px] object-cover ${card!.reversed ? "rotate-180" : ""}`} />
+                      <img src={thumb} alt={card!.name} className={`aspect-[440/800] w-full max-w-[56px] rounded-[3px] object-cover ${isReversed(card!) ? "rotate-180" : ""}`} />
                     ) : (
                       <span className="flex aspect-[440/800] w-full max-w-[56px] items-center justify-center rounded-[3px] bg-paper px-0.5 text-center text-[11px] leading-tight text-ink-soft">
                         {card ? card.name : "未選"}
@@ -557,7 +560,9 @@ export function CardsPicker({
                     )}
                   </button>
                   {locked ? (
-                    <span className="text-xs text-ink-soft">{card?.reversed ? "倒" : "正"}</span>
+                    <span className="text-xs text-ink-soft">{card ? orientMark(card) || "不分正倒" : ""}</span>
+                  ) : card && !hasOrient(card.name) ? (
+                    <span className="py-0.5 text-xs whitespace-nowrap text-ink-soft">不分正倒</span>
                   ) : (
                   <div role="group" aria-label={`${item.label}正倒位`} className="grid w-full grid-cols-2 overflow-hidden rounded-full border border-line">
                     {[false, true].map((reversed) => {

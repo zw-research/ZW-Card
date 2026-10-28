@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CARD_CATEGORY, CATEGORIES } from "./cards";
+import { CARD_CATEGORY, CATEGORIES, fixOrient, hasOrient, isReversed, orientMark } from "./cards";
 import { cardThumb } from "./cardImages";
 import { CardZoom } from "./cardView";
 import { cardSetToText, emptyPicks, explain, layoutOf, normId, type CardSet, type LayoutId, type Mcp, type Pick, type Picks } from "./cases";
@@ -56,7 +56,7 @@ function fillRandom(set: CardSet): CardSet {
     const free = pile.filter((n) => !used.has(n));
     const name = (free.length ? free : pile)[randomIndex((free.length ? free : pile).length)];
     used.add(name);
-    groups[s.g][s.key] = { name, reversed: randomIndex(2) === 1 };
+    groups[s.g][s.key] = fixOrient({ name, reversed: randomIndex(2) === 1 });
   }
   return { ...set, groups };
 }
@@ -123,7 +123,7 @@ export function SmallSpread({
     if (!active) return;
     const [g, key] = [Number(active.split(":")[0]), active.split(":")[1]];
     const cur = set.groups[g][key];
-    const groups = set.groups.map((group, i) => (i === g ? { ...group, [key]: { name, reversed: cur?.reversed ?? false } } : group));
+    const groups = set.groups.map((group, i) => (i === g ? { ...group, [key]: fixOrient({ name, reversed: cur?.reversed ?? false }) } : group));
     const next = { ...set, groups };
     setSet(next);
     const all = slotsOf(next);
@@ -214,21 +214,21 @@ export function SmallSpread({
       <div key={sid(s)} className="flex flex-col items-center gap-1" style={{ width: cw + 4 }}>
         <span className={`text-[11px] leading-none whitespace-nowrap ${life ? "font-medium text-wine" : "text-ink-soft"}`}>
           {POS_LABEL[s.key]}
-          {card ? `・${card.name}${card.reversed ? "倒" : ""}` : ""}
+          {card ? `・${card.name}${isReversed(card) ? "倒" : ""}` : ""}
         </span>
         <button
           type="button"
           aria-pressed={on}
-          aria-label={`${slotName(set, s)}：${card ? `${card.name}${card.reversed ? "倒" : "正"}` : "未選"}`}
+          aria-label={`${slotName(set, s)}：${card ? `${card.name}${orientMark(card)}` : "未選"}`}
           // 可以改的時候：點空格或別格＝選這格、點已選中的那格＝看大圖；不能改的時候點牌就看大圖
           onClick={() => (!editable ? card && setZoom(card) : on && card ? setZoom(card) : (setActive(sid(s)), setTabId(null)))}
           className={`block overflow-hidden rounded-[5px] p-0 ${FOCUS} ${card ? "" : "flex items-center justify-center border border-dashed border-line-strong text-xs text-ink-soft"} ${on ? "outline-2 outline-offset-2 outline-wine" : ""}`}
           style={{ width: cw, height: Math.round((cw * 800) / 440) }}
         >
           {card && src ? (
-            <img src={src} alt="" className={`block h-full w-full object-cover ${card.reversed ? "rotate-180" : ""}`} />
+            <img src={src} alt="" className={`block h-full w-full object-cover ${isReversed(card) ? "rotate-180" : ""}`} />
           ) : card ? (
-            <span className={`text-sm ${card.reversed ? "rotate-180" : ""}`}>{card.name}</span>
+            <span className={`text-sm ${isReversed(card) ? "rotate-180" : ""}`}>{card.name}</span>
           ) : (
             POS_LABEL[s.key] === "主星" || /主$/.test(POS_LABEL[s.key]) ? "主" : POS_LABEL[s.key] === "輔星" || /輔$/.test(POS_LABEL[s.key]) ? "副" : POS_LABEL[s.key]
           )}
@@ -346,6 +346,9 @@ export function SmallSpread({
         <div className="rounded-xl bg-paper p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-sm text-ink">{slotName(set, activeSlot)}</span>
+            {cur && !hasOrient(cur.name) ? (
+              <span className="text-xs text-ink-soft">空宮不分正倒</span>
+            ) : (
             <div role="group" aria-label="正倒位" className="grid grid-cols-2 overflow-hidden rounded-full border border-line">
               {[false, true].map((reversed) => {
                 const on = !!cur && cur.reversed === reversed;
@@ -363,6 +366,7 @@ export function SmallSpread({
                 );
               })}
             </div>
+            )}
           </div>
           {cats.length > 1 && (
             <div role="tablist" aria-label="分類" className="mb-3 flex gap-4 border-b border-line">

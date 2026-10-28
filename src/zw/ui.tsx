@@ -2,7 +2,7 @@
 
 import Link from "./shims/link";
 import { useEffect, useState } from "react";
-import { CARD_CATEGORY, SLOTS, cardHref, type Tone } from "./cards";
+import { CARD_CATEGORY, SLOTS, cardHref, hasOrient, type Tone } from "./cards";
 import { formatDate, loadImage, type Reading } from "./store";
 
 export const TONES: Record<
@@ -228,11 +228,16 @@ export function CardTile({
     >
       <span className="sr-only">{label}：</span>
       <span className={`font-medium tracking-[0.12em] ${tone?.text ?? ""}`}>{name}</span>
-      <span aria-hidden className="h-4 w-px bg-ink/30" />
-      <span className={reversed ? "font-medium text-gold-deep" : "text-ink-soft"}>
-        {reversed ? "倒" : "正"}
-        <span className="sr-only">位</span>
-      </span>
+      {/* 空宮不分正倒 */}
+      {hasOrient(name) && (
+        <>
+          <span aria-hidden className="h-4 w-px bg-ink/30" />
+          <span className={reversed ? "font-medium text-gold-deep" : "text-ink-soft"}>
+            {reversed ? "倒" : "正"}
+            <span className="sr-only">位</span>
+          </span>
+        </>
+      )}
     </Link>
   );
 }

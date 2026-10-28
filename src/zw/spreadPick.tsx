@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CARD_CATEGORY, CATEGORIES } from "./cards";
+import { CARD_CATEGORY, CATEGORIES, fixOrient, hasOrient, isReversed, orientMark } from "./cards";
 import { CardZoom } from "./cardView";
 import { FOCUS, TONES } from "./ui";
 
@@ -43,7 +43,7 @@ function setCard(d: Draft, key: Key, card: Card): Draft {
 }
 export const pickedCount = (d: Draft) => ORDER.filter((o) => getCard(d, o.key)).length;
 const slotLabel = (d: Draft, key: Key) => (key === "body" ? "身宮" : key === "stage" ? "長生" : `${d.cells[Number(key.slice(1, -1))].palace}・${key.endsWith("m") ? "主星" : "輔星"}`);
-const cardText = (c: Card) => `${c.name}${c.reversed ? "倒" : "正"}`;
+const cardText = (c: Card) => `${c.name}${orientMark(c)}`;
 
 export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft; onChange: (d: Draft) => void; onDone: () => void; title: string }) {
   const [active, setActive] = useState<Key | null>(() => ORDER.find((o) => !getCard(draft, o.key))?.key ?? null);
@@ -58,7 +58,7 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
   function pick(name: string) {
     if (!active) return;
     const cur = getCard(draft, active);
-    const next = setCard(draft, active, { name, reversed: cur?.reversed ?? false });
+    const next = setCard(draft, active, fixOrient({ name, reversed: cur?.reversed ?? false }));
     onChange(next);
     // 自動跳到下一個空格（往後找，找不到再從頭找）
     const i = ORDER.findIndex((o) => o.key === active);
@@ -70,8 +70,8 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
   const slot = (key: Key, big = false) => {
     const card = getCard(draft, key);
     const on = key === active;
-    const ink = card ? (SHA.includes(card.name) ? "text-star-red border-star-red" : card.name === "祿存" ? "text-star-green border-star-green" : card.reversed ? "text-mist-deep" : "text-ink") : "";
-    const face = card ? (card.reversed ? "bg-mist-soft border-mist" : "bg-taupe-soft border-taupe") : "border-dashed border-line-strong bg-transparent text-ink-soft";
+    const ink = card ? (SHA.includes(card.name) ? "text-star-red border-star-red" : card.name === "祿存" ? "text-star-green border-star-green" : isReversed(card) ? "text-mist-deep" : "text-ink") : "";
+    const face = card ? (isReversed(card) ? "bg-mist-soft border-mist" : "bg-taupe-soft border-taupe") : "border-dashed border-line-strong bg-transparent text-ink-soft";
     const empty = key === "stage" ? "長生" : key === "body" || key.endsWith("m") ? "主" : "副";
     return (
       <button
@@ -84,7 +84,7 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
         className={`flex items-center justify-center rounded-[5px] border ${face} ${ink} ${big ? "h-[88px] w-[52px] text-xl" : "h-[58px] w-[33px] text-[14px]"} leading-none font-medium ${FOCUS} ${on ? "outline-2 outline-offset-1 outline-wine" : ""}`}
       >
         {card ? (
-          <span className={`flex flex-col items-center gap-0.5 ${card.reversed ? "rotate-180" : ""}`}>
+          <span className={`flex flex-col items-center gap-0.5 ${isReversed(card) ? "rotate-180" : ""}`}>
             {[...card.name].map((ch, i) => (
               <span key={i}>{ch}</span>
             ))}
@@ -154,6 +154,9 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
         <div className="rounded-xl bg-paper p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-sm text-ink">{slotLabel(draft, active)}</span>
+            {cur && !hasOrient(cur.name) ? (
+              <span className="text-xs text-ink-soft">空宮不分正倒</span>
+            ) : (
             <div role="group" aria-label="正倒位" className="grid grid-cols-2 overflow-hidden rounded-full border border-line">
               {[false, true].map((reversed) => {
                 const on = !!cur && cur.reversed === reversed;
@@ -171,6 +174,7 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
                 );
               })}
             </div>
+            )}
           </div>
           {cats.length > 1 && (
             <div role="tablist" aria-label={`${slotLabel(draft, active)}分類`} className="mb-3 flex gap-4 border-b border-line">
