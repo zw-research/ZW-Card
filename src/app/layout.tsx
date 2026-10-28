@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "紫微命盤",
-  description: "紫微斗數個人命盤",
+  description: "紫微斗數命盤、牌陣、取數、取卦",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Link>
           </div>
           <p className="bg-paper px-4 py-2.5 text-center text-xs tracking-[0.12em] text-ink-soft">
-            紫微斗數・個人命盤
+            紫微斗數・命盤與牌卡
           </p>
         </header>
         {children}

@@ -1,0 +1,86 @@
+// 紫微斗數 / 星曜資料庫：星曜名稱 → Notion 頁面（直接寫在頁面裡，打開時不用再查 Notion）
+// 資料庫新增星曜時，請小C 重新產生這份清單
+const STAR_PAGES: Record<string, string> = {
+  "養": "394eb16a24f480c7a44cc3aa80991865",
+  "胎": "394eb16a24f480ae8022f718f568ef48",
+  "絕": "394eb16a24f480c7b61fcb77d93abbe5",
+  "墓": "394eb16a24f4800e9ab1df8e7ddc14cb",
+  "死": "394eb16a24f4808eba8bfe52e1741425",
+  "病": "394eb16a24f480a79a23c7b6c032f3d7",
+  "衰": "394eb16a24f480c59fdbea4af4cf435a",
+  "帝旺": "394eb16a24f4804ea4a9e8ba340cf050",
+  "臨官": "394eb16a24f480abbf5dc04320be9775",
+  "冠帶": "394eb16a24f4803789b1d2c64119a5a0",
+  "沐浴": "394eb16a24f480bbbb29f35856aea2f6",
+  "長生": "394eb16a24f4809996c1eae2a4157b28",
+  "鸞喜": "394eb16a24f48057aff9e9bd32fcf661",
+  "陰煞": "394eb16a24f4808292b8daba4792607e",
+  "空劫": "394eb16a24f480c1a552ea48dcbcea15",
+  "天鉞": "394eb16a24f480f4a5fdf4c1caa81e1e",
+  "天魁": "394eb16a24f4800bb913ccdaa6a17b98",
+  "祿存": "394eb16a24f480ff9495dfac6cbb5aeb",
+  "天刑": "394eb16a24f480069371eda47bcddb60",
+  "火星": "394eb16a24f480e895fae31128ba77ad",
+  "鈴星": "394eb16a24f480c99361dcd8b0b8d814",
+  "陀羅": "394eb16a24f480f28a9df79be3e9ac40",
+  "擎羊": "394eb16a24f480e7be10d2ff935d2b24",
+  "右弼": "394eb16a24f480489f15caf3ddffa4eb",
+  "左輔": "394eb16a24f480f6a19df03ec65d36ae",
+  "文曲": "394eb16a24f480abb9b2cb4ee336c2d5",
+  "文昌": "394eb16a24f4800db6cafaf8a3a8bf23",
+  "化忌": "394eb16a24f480f48e54d4a0a67448f7",
+  "化科": "394eb16a24f4808f9ed3c3eeb32a5119",
+  "化權": "394eb16a24f48080969bfc627179268c",
+  "化祿": "394eb16a24f48000b622ff6d7001211c",
+  "空宮": "394eb16a24f4807fa94dcc5cc102fea3",
+  "同梁": "394eb16a24f480e8947ac0025cc1f737",
+  "同巨": "394eb16a24f48089af5ad2c5fa9404ae",
+  "陰同": "394eb16a24f48064a601d33db10edaee",
+  "陽梁": "394eb16a24f480638b44c8a5a1818e84",
+  "巨日": "394eb16a24f480d689f5fc19b0456b0d",
+  "日月": "394eb16a24f48018bbf9e0ae32837996",
+  "機梁": "394eb16a24f48017862ddf6111751215",
+  "機巨": "394eb16a24f4802d9839e212258fe60c",
+  "機陰": "394eb16a24f4806292d1fcc96586068c",
+  "廉貪": "394eb16a24f4801a8c00d6eadb4d581f",
+  "廉破": "394eb16a24f480d89123df037cfc13a7",
+  "廉殺": "394eb16a24f480f2b1ace953815e2d84",
+  "廉相": "394eb16a24f4804b8b30df064a6d2b20",
+  "廉府": "394eb16a24f4800486d2c62e924d3bd1",
+  "武貪": "394eb16a24f4801eaf1fc5399f457e96",
+  "武破": "394eb16a24f4800b9d05d77c18582e39",
+  "武殺": "394eb16a24f4803bb16be678a2859302",
+  "武相": "394eb16a24f4801d9c50e844e45bf0e6",
+  "武府": "394eb16a24f480a292d5e17b5fc0502a",
+  "紫貪": "394eb16a24f480379d44e5c2b486b50f",
+  "紫破": "394eb16a24f4806fbd30d1a1cd73116c",
+  "紫殺": "394eb16a24f4805b8052da1ee0430571",
+  "紫相": "394eb16a24f480c28affe37563cb8f84",
+  "紫府": "394eb16a24f48008b29fdd6c588c7c0d",
+  "破軍": "394eb16a24f480809f75c65719371e2c",
+  "七殺": "394eb16a24f48048a2a2c6676d8f930e",
+  "天梁": "394eb16a24f480e28c4ce83b91786b31",
+  "天相": "394eb16a24f480c690bde80ad60d99c1",
+  "巨門": "394eb16a24f4802982bfc9a47940e6ab",
+  "貪狼": "394eb16a24f480d3a197c10b70748e32",
+  "太陰": "394eb16a24f48011b0eff7330ae6ed3f",
+  "天府": "394eb16a24f4808fb021fd1f2dad6da0",
+  "廉貞": "394eb16a24f480c383e8c01a82a23480",
+  "天同": "394eb16a24f480f3aeb1cf883f53feb7",
+  "武曲": "394eb16a24f4809a91ccf4d88d124eae",
+  "太陽": "394eb16a24f480e1a14ce993ca9fe136",
+  "天機": "394eb16a24f4801c9b87d3708bbc5fb0",
+  "紫微": "394eb16a24f480248124c25f321f5000",
+};
+
+// 星曜資料庫頁面 ID（日運的主星、輔星、長生、身宮關聯用）；反查用名稱
+export const starPageId = (name: string) => STAR_PAGES[name] ?? null;
+export const starNameById = (id: string) => {
+  const clean = (id || "").split("/").pop()!.split("?")[0].replaceAll("-", "").toLowerCase();
+  return Object.keys(STAR_PAGES).find((name) => STAR_PAGES[name] === clean) ?? null;
+};
+
+export function starPageUrl(name: string) {
+  const id = STAR_PAGES[name];
+  return id ? `https://www.notion.so/${id}` : null;
+}
