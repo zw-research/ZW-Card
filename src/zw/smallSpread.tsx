@@ -5,7 +5,7 @@ import { CardZoom } from "./cardView";
 import { cardSetToText, emptyPicks, explain, layoutOf, normId, type CardSet, type LayoutId, type Mcp, type Pick, type Picks } from "./cases";
 import { toggleBlock } from "./chart";
 import { randomIndex } from "./draw";
-import { BUTTON_GHOST, FOCUS, TONES } from "./ui";
+import { BUTTON_GHOST, CopyBox, FOCUS, TONES, shortTime } from "./ui";
 
 // 牌陣頁的小牌型（2026/10/28）：三張（可多組）、三張＋身宮、命遷＋長生。
 // 先取數（天干），牌由電腦隨機抽或手動選；盤上直接放牌卡圖（倒牌轉 180 度），不寫宮位干支。
@@ -415,6 +415,13 @@ export function SmallSpread({
             ))}
           </div>
         </div>
+      )}
+
+      {/* 選滿才給複製文字：第一行時間、牌型、問事／年運、取數，第二行和案例牌組欄同一種寫法 */}
+      {done && (
+        <CopyBox
+          text={`${shortTime(value.at)} ${SMALL_NAMES[value.layout]}｜${value.kind}${value.kind === "年運" ? ` ${value.year}` : ""}｜${value.stem ? `取數${value.stem}干` : "不取數"}${value.question ? `｜${value.question}` : ""}\n${cardSetToText(set)}`}
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-3">

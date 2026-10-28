@@ -342,3 +342,36 @@ export function ReadingItem({
     </article>
   );
 }
+
+// 複製給小P用的短時間「10/28 20:31」
+export function shortTime(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// 複製文字給小P（2026/10/28）：文字可長按選取＋一顆小按鈕；日運、牌陣共用
+// clamp：長文字（十二宮）只露兩行，避免佔太多版面；複製的還是全文
+export function CopyBox({ text, label = "複製牌組文字", clamp = false }: { text: string; label?: string; clamp?: boolean }) {
+  const [msg, setMsg] = useState("");
+  useEffect(() => setMsg(""), [text]);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMsg("已複製，可以直接貼給小P。");
+    } catch {
+      setMsg("這裡不能自動複製，請長按文字複製。");
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-line px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className={`min-w-0 flex-1 text-sm break-words whitespace-pre-wrap select-all ${clamp ? "line-clamp-2" : ""}`}>{text}</span>
+        <button type="button" onClick={copy} className={`shrink-0 rounded-full border border-line px-3 py-1 text-xs ${FOCUS} hover:bg-paper`}>
+          {label}
+        </button>
+      </div>
+      {msg && <span className="text-xs text-ink-soft">{msg}</span>}
+    </div>
+  );
+}

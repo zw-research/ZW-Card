@@ -5,7 +5,7 @@ import { explain, normId, type Mcp } from "./cases";
 import { GUA_PALACES, TIMES, toggleBlock } from "./chart";
 import { branchOf, randomIndex, stemOf } from "./draw";
 import type { GuaPerson } from "./gua";
-import { BUTTON_GHOST, BUTTON_PRIMARY, FOCUS, INPUT } from "./ui";
+import { BUTTON_GHOST, BUTTON_PRIMARY, CopyBox, FOCUS, INPUT, shortTime } from "./ui";
 import { CardGallery, CardZoom } from "./cardView";
 import { SpreadPicker, pickedCount, type Draft } from "./spreadPick";
 import { SMALL_NAMES, SmallSpread, newSmall, type Small } from "./smallSpread";
@@ -1048,6 +1048,9 @@ export function SpreadView({
               </div>
             </div>
           </details>
+
+          {/* 複製牌組文字給小P：第一行抽牌時間＋問題，第二行和案例牌組欄同一種寫法 */}
+          <CopyBox text={`${shortTime(spread.at)} 十二宮牌陣${spread.question ? `｜${spread.question}` : ""}\n${spreadText(spread)}`} clamp />
 
           <div className="flex flex-wrap items-center gap-3">
             {!fromCase && mcp && (
