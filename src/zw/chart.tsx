@@ -260,7 +260,12 @@ export function dailyBoardText(chart: Astrolabe, date: string) {
     return tags.length ? `${name}（${tags.join("・")}）` : name;
   };
   const list = (stars: Star[]) => stars.map((star) => mutagenOf(star.name, star.mutagen)).join("、");
-  const order = GUA_PALACES.map((name) => (daily.palaceNames as readonly string[]).indexOf(name));
+  // 排盤套件的流日宮名用「僕役」，卦的宮名用「交友」：兩種都要對到，不然會漏掉一宮
+  const dailyNames = daily.palaceNames as readonly string[];
+  const order = GUA_PALACES.map((name) => {
+    const i = dailyNames.indexOf(name);
+    return i >= 0 ? i : dailyNames.indexOf(name === "交友" ? "僕役" : name);
+  });
   const lines: string[] = [
     `- **${date.replaceAll("-", "/")}｜日${daily.heavenlyStem}${daily.earthlyBranch}・月${horoscope.monthly.heavenlyStem}${horoscope.monthly.earthlyBranch}・年${horoscope.yearly.heavenlyStem}${horoscope.yearly.earthlyBranch}・大限${horoscope.decadal.heavenlyStem}${horoscope.decadal.earthlyBranch}**（手機頁依命盤名單「自己」計算）`,
   ];
@@ -1093,6 +1098,36 @@ function useFitToScreen(ref: React.RefObject<HTMLDivElement | null>) {
   return fit;
 }
 
+// 隱藏生日：命盤中央的國曆、農曆、干支、時辰、生肖，名單上的出生年，大限的年份（改寫歲數）都收起來。
+// 只存在這個瀏覽器；命盤頁各處（命盤、名單、取卦、日運的看日盤）同一個開關。
+const HIDE_BIRTH_KEY = "zw-chart.hide-birth";
+const HIDE_BIRTH_EVENT = "zw-chart:hide-birth";
+let hideBirthMemory = false;
+function readHideBirth() {
+  try {
+    return localStorage.getItem(HIDE_BIRTH_KEY) === "1";
+  } catch {
+    return hideBirthMemory;
+  }
+}
+function subscribeHideBirth(callback: () => void) {
+  window.addEventListener(HIDE_BIRTH_EVENT, callback);
+  return () => window.removeEventListener(HIDE_BIRTH_EVENT, callback);
+}
+export function useHideBirth(): [boolean, (next: boolean) => void] {
+  const hidden = useSyncExternalStore(subscribeHideBirth, readHideBirth, () => false);
+  const set = (next: boolean) => {
+    hideBirthMemory = next;
+    try {
+      localStorage.setItem(HIDE_BIRTH_KEY, next ? "1" : "0");
+    } catch {
+      // 瀏覽器存不了就只在這次開啟有效
+    }
+    window.dispatchEvent(new Event(HIDE_BIRTH_EVENT));
+  };
+  return [hidden, set];
+}
+
 export function ChartView({
   profile,
   chart,
@@ -1116,6 +1151,7 @@ export function ChartView({
   autoScroll?: boolean;
 }) {
   const today = useToday();
+  const [hideBirth, setHideBirth] = useHideBirth();
   const currentTimeIndex = useSyncExternalStore(
     subscribeNever,
     getCurrentTimeIndex,
@@ -1285,12 +1321,16 @@ export function ChartView({
   }
 
   const facts = [
-    ["國曆", chart.solarDate],
-    ["農曆", chart.lunarDate],
-    ["干支", chart.chineseDate],
-    ["時辰", chart.time],
+    ...(hideBirth
+      ? []
+      : [
+          ["國曆", chart.solarDate],
+          ["農曆", chart.lunarDate],
+          ["干支", chart.chineseDate],
+          ["時辰", chart.time],
+        ]),
     ["五行", chart.fiveElementsClass],
-    ["生肖", chart.zodiac],
+    ...(hideBirth ? [] : [["生肖", chart.zodiac]]),
     ...(gua ? [["卦", `${gua.stem}${gua.branch}｜${gua.mode === "B" ? "卦命" : (gua.main ?? gua.palace)}`]] : []),
   ];
   // 選了運限層次時，中央另外列出所看的時間，只寫到所選層次的精細度：
@@ -1304,7 +1344,7 @@ export function ChartView({
       // 起運前借最後一個大限的宮位來看，年份則是出生那年到起運的前一年
       const firstStart = Math.min(...chart.palaces.map((palace) => palace.decadal.range[0]));
       const [from, to] = horoscope.realAge < firstStart ? [0, firstStart - 1] : [start, end];
-      return [["年份", `${birthYear + from}–${birthYear + to}`]];
+      return [hideBirth ? ["歲數", `${from}–${to} 歲`] : ["年份", `${birthYear + from}–${birthYear + to}`]];
     }
     if (depth === 2) return [["年份", String(birthYear + horoscope.realAge)]];
     const [year, month, day] = date.split("-").map(Number);
@@ -1540,6 +1580,20 @@ export function ChartView({
             <span className="ml-2 text-xs font-normal tracking-normal text-ink-soft @5xl:text-sm">
               {chart.gender}
             </span>
+            <button
+              type="button"
+              onClick={() => setHideBirth(!hideBirth)}
+              aria-pressed={hideBirth}
+              aria-label={hideBirth ? "顯示生日" : "隱藏生日"}
+              title={hideBirth ? "顯示生日" : "隱藏生日"}
+              className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full align-[-3px] text-ink-soft hover:bg-line ${FOCUS}`}
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z" />
+                <circle cx="10" cy="10" r="2.3" />
+                {hideBirth && <path d="M3.5 3.5l13 13" />}
+              </svg>
+            </button>
           </p>
           <dl className={FACT_LIST}>
             {facts.map(([label, value]) => (
