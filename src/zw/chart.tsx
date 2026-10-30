@@ -329,6 +329,9 @@ const HIDDEN_STARS = new Set([
 const LAYER_PREFIXES = "運流月日時";
 // 各層的祿、羊、陀另外放在格子右下
 const CORNER_FLOW_STARS = "祿羊陀";
+// 本命祿存、擎羊、陀羅（隱藏生日＋近三層看到流月以下時不畫）
+const NATAL_LU_YANG_TUO = new Set(["祿存", "擎羊", "陀羅"]);
+const DECADAL_ORDINALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
 // 本命的擎羊、陀羅、火星、鈴星用紅色，祿存用綠色
 const NATAL_STAR_COLORS: Record<string, string> = {
   擎羊: "text-star-red",
@@ -520,8 +523,11 @@ function StarLabel({
   layers = [],
   flying = [],
   className = "inline-flex",
+  hideNatal = false,
 }: {
   star: Star;
+  // 隱藏生日＋近三層看到流月以下時，不畫本命四化
+  hideNatal?: boolean;
   // 選到的每一層，由大限開始依序排
   layers?: ActiveLayer[];
   // 點選的宮位用宮干飛出去的四化：依序是化祿、化權、化科、化忌的星
@@ -539,7 +545,7 @@ function StarLabel({
       label: "本命",
       natal: true,
       dashed: false,
-      index: MUTAGEN_NAMES.indexOf(star.mutagen ?? ""),
+      index: hideNatal ? -1 : MUTAGEN_NAMES.indexOf(star.mutagen ?? ""),
     },
     ...layers.map(({ layer, item }) => ({
       label: layer.label,
@@ -794,7 +800,13 @@ function PalaceCell({
   showAdjective,
   jiekong,
   onSelect,
+  hideNatal,
+  decadalLabel,
 }: {
+  // 隱藏生日＋近三層看到流月以下：不畫本命四化和本命祿存、擎羊、陀羅
+  hideNatal: boolean;
+  // 隱藏生日時大限歲數改寫第幾限（一限、二限…）；空字串就照常寫歲數
+  decadalLabel: string;
   // 這一宮是不是截空
   jiekong: boolean;
   // 手機上也顯示全部雜曜（較寬的畫面本來就會顯示）
@@ -871,7 +883,7 @@ function PalaceCell({
       <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-2.5">
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
           {palace.majorStars.map((star) => (
-            <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} />
+            <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} hideNatal={hideNatal} />
           ))}
         </div>
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-xs leading-[1.15] text-mist-deep @2xl:text-sm @5xl:gap-x-1 @5xl:text-base @5xl:leading-[1.15]">
@@ -879,7 +891,7 @@ function PalaceCell({
           {palace.minorStars
             .filter((star) => !NATAL_STAR_COLORS[star.name])
             .map((star) => (
-              <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} />
+              <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} hideNatal={hideNatal} />
             ))}
         </div>
         {/* 雜曜只在較寬的畫面顯示，手機上省略；紅鸞、天喜、陰煞、蜚廉另外放到右下 */}
@@ -960,12 +972,12 @@ function PalaceCell({
         </div>
         <div className={`min-h-[2.3em] justify-end ${FLOW_ROW}`}>
           {palace.minorStars
-            .filter((star) => NATAL_STAR_COLORS[star.name])
+            .filter((star) => NATAL_STAR_COLORS[star.name] && !(hideNatal && NATAL_LU_YANG_TUO.has(star.name)))
             .map((star) => (
               <StarLabel
                 key={star.name}
                 star={star}
-                layers={chipLayers} flying={flying}
+                layers={chipLayers} flying={flying} hideNatal={hideNatal}
                 className={`inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`}
               />
             ))}
@@ -1005,7 +1017,7 @@ function PalaceCell({
               {palace.changsheng12}
             </span>
             <span className="text-[9px] leading-3 whitespace-nowrap @2xl:text-[11px] @2xl:leading-4 @5xl:text-[13px] @5xl:leading-4">
-              {palace.decadal.range[0]}–{palace.decadal.range[1]}
+              {decadalLabel || `${palace.decadal.range[0]}–${palace.decadal.range[1]}`}
             </span>
           </div>
           {/* 較寬的畫面：運限宮名夾在大限歲數和干支之間，固定寬度讓各宮對齊 */}
@@ -1253,6 +1265,10 @@ export function ChartView({
         item: horoscope[layer.key],
       }))
     : [];
+  // 隱藏生日＋近三層看到流月以下（流月、流日、流時）：盤上不畫本命四化和本命祿羊陀，讓盤面乾淨
+  const hideNatal = hideBirth && nearOnly && depth >= 3;
+  // 大限依起運歲數排第幾限
+  const decadalOrder = chart.palaces.map((palace) => palace.decadal.range[0]).sort((a, b) => a - b);
   // 小限開著時排在大限後面、流年前面；大限不在列表裡時排最前面；只看本命時也可以單獨疊小限
   const ageAt = flowChipLayers[0]?.layer.key === "decadal" ? 1 : 0;
   const guaLayer: ActiveLayer[] = gua ? [{ layer: GUA_LAYER, item: guaItem(chart, gua) }] : [];
@@ -1559,6 +1575,8 @@ export function ChartView({
             flying={flying}
             showAdjective={showAdjective}
             jiekong={palace.earthlyBranch === jiekongBranch(chart)}
+            hideNatal={hideNatal}
+            decadalLabel={hideBirth ? `${DECADAL_ORDINALS[decadalOrder.indexOf(palace.decadal.range[0])]}限` : ""}
             state={
               focus === palace.index
                 ? "selected"
