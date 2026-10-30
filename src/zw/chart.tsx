@@ -1329,8 +1329,7 @@ export function ChartView({
           ["干支", chart.chineseDate],
           ["時辰", chart.time],
         ]),
-    ["五行", chart.fiveElementsClass],
-    ...(hideBirth ? [] : [["生肖", chart.zodiac]]),
+    ...(hideBirth ? [] : [["五行", chart.fiveElementsClass], ["生肖", chart.zodiac]]),
     ...(gua ? [["卦", `${gua.stem}${gua.branch}｜${gua.mode === "B" ? "卦命" : (gua.main ?? gua.palace)}`]] : []),
   ];
   // 選了運限層次時，中央另外列出所看的時間，只寫到所選層次的精細度：
@@ -1344,7 +1343,8 @@ export function ChartView({
       // 起運前借最後一個大限的宮位來看，年份則是出生那年到起運的前一年
       const firstStart = Math.min(...chart.palaces.map((palace) => palace.decadal.range[0]));
       const [from, to] = horoscope.realAge < firstStart ? [0, firstStart - 1] : [start, end];
-      return [hideBirth ? ["歲數", `${from}–${to} 歲`] : ["年份", `${birthYear + from}–${birthYear + to}`]];
+      // 隱藏生日時年份和歲數都不寫（年份推得出出生年，歲數推得出年紀）
+      return hideBirth ? [] : [["年份", `${birthYear + from}–${birthYear + to}`]];
     }
     if (depth === 2) return [["年份", String(birthYear + horoscope.realAge)]];
     const [year, month, day] = date.split("-").map(Number);
@@ -1498,8 +1498,9 @@ export function ChartView({
         {/* 各層的干支移到命盤中央最下面，這裡只留農曆與歲數 */}
         {horoscope ? (
           <p className="text-xs text-ink-soft sm:text-sm">
-            農曆 {horoscope.lunarDate}・實歲 {horoscope.realAge}
-            {showAge && `・虛歲 ${horoscope.age.nominalAge}`}
+            農曆 {horoscope.lunarDate}
+            {!hideBirth && `・實歲 ${horoscope.realAge}`}
+            {showAge && !hideBirth && `・虛歲 ${horoscope.age.nominalAge}`}
           </p>
         ) : (
           <p className="text-sm text-ink-soft">請選擇日期。</p>
