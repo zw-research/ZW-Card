@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { solar2lunar } from "lunar-lite";
 import { CARD_CATEGORY, CATEGORIES, fixOrient, hasOrient, isReversed, orientMark } from "./cards";
-import { explain, normId, type Mcp } from "./cases";
+import { explain, normId, pageContent, type Mcp } from "./cases";
 import { GUA_PALACES, TIMES, toggleBlock } from "./chart";
 import { branchOf, randomIndex, stemOf } from "./draw";
 import type { GuaPerson } from "./gua";
@@ -327,6 +327,76 @@ function timeLabel(iso: string) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(h)}:${pad(d.getMinutes())}（${shichen}）`;
 }
 
+// 存案例時內文「牌陣」收合標題（含十二宮）；存檔和改存過的取數（2026/10/31）共用同一套寫法
+// keep：不跟取數變的行（命盤、抽牌時間、取數方式、抽牌方式）
+export type SpreadKeep = { person: string | null; time: string; num: string; how: string };
+function spreadToggle(sp: Spread, keep: SpreadKeep) {
+  const hitText = (hits: Hit[]) => hits.map((h) => `${h.star}化${MUTAGEN_NAMES[h.index]}→${h.where.length ? h.where.join("、") : "不在盤上"}`).join("；");
+  const lytOf = (stem: string) => luYangTuo(stem).map((b) => sp.cells.find((c) => c.branch === b)!.palace);
+  const lytText = (where: string[]) => LYT.map((name, i) => `${name}→${where[i]}`).join("、");
+  const drawHits = flyFrom(sp, sp.stem);
+  const drawLyt = lytOf(sp.stem);
+  const yearGZ = /^\d{4}$/.test(sp.year) ? yearGanzhi(Number(sp.year)) : "";
+  const yearHits = yearGZ ? flyFrom(sp, yearGZ[0]) : [];
+  const yearLyt = yearGZ ? lytOf(yearGZ[0]) : [];
+  const yearLabel = yearGZ ? `年干 ${yearGZ}（${sp.kind === "年運" ? "" : "農曆 "}${sp.year}）` : "";
+  const drawLayer: Layer = { tag: "取數", lyt: drawLyt, ji: drawHits[3] };
+  const yearLayer: Layer = { tag: "年", lyt: yearLyt, ji: yearHits[3] };
+  const lines = [
+    `- 類型：${sp.kind === "年運" ? `年運（${sp.year}）` : "問事"}`,
+    `- 取數天干：${sp.stem}　命宮在${sp.life}`,
+    ...(keep.person !== null ? [`- 命盤：${keep.person}`] : []),
+    `- 抽牌時間：${keep.time}`,
+    `- 取數方式：${keep.num}`,
+    `- 抽牌方式：${keep.how}`,
+    `- 取數干四化：${hitText(drawHits)}`,
+    `- 取數干祿羊陀：${lytText(drawLyt)}`,
+    ...(yearGZ ? [`- ${yearLabel}四化：${hitText(yearHits)}`, `- 年干祿羊陀：${lytText(yearLyt)}`] : []),
+    `- 煞忌兩個以上（牌＋取數干${yearGZ ? "＋年干" : ""}）：${shaJiText(atLeastTwo(shaJiMap(sp, [drawLayer, ...(yearGZ ? [yearLayer] : [])])))}`,
+    `- 對宮線煞忌兩顆以上（只算牌）：${axisMap(sp, shaJiMap(sp, [])).map((a) => `${a.pair.join("－")}（${a.list.join("、")}）`).join("；") || "沒有"}`,
+  ];
+  const board = [
+    ...sp.cells.map((c) => `- **${c.palace}（${c.stem}${c.branch}）**：${cardText(c.main)}｜${cardText(c.minor)}　${c.stem}干飛：${hitText(flyFrom(sp, c.stem))}`),
+    `- **身宮**：${cardText(sp.body)}　**長生**：${cardText(sp.stage)}`,
+  ];
+  return toggleBlock(2, "牌陣", `${lines.join("\n")}\n${toggleBlock(3, "十二宮", board.join("\n"))}`);
+}
+
+// 從 Notion 讀回的內文找「牌陣」那個 h2 收合標題（含裡面的十二宮），照原樣切出來給 update_content 比對
+export function findSpreadToggle(content: string): string | null {
+  const start = content.search(/<toggle heading="h2">\n牌陣\n/);
+  if (start < 0) return null;
+  const re = /<toggle\b[^>]*>|<\/toggle>/g;
+  re.lastIndex = start;
+  let depth = 0;
+  for (let m = re.exec(content); m; m = re.exec(content)) {
+    depth += m[0] === "</toggle>" ? -1 : 1;
+    if (depth === 0) return content.slice(start, m.index + m[0].length);
+  }
+  return null;
+}
+// 舊的收合標題裡，不跟取數變的那幾行
+function keepFrom(block: string): SpreadKeep {
+  const line = (label: string) => block.match(new RegExp(`^- ${label}：(.*)$`, "m"))?.[1]?.trim() ?? null;
+  return { person: line("命盤"), time: line("抽牌時間") ?? "", num: line("取數方式") ?? "", how: line("抽牌方式") ?? "" };
+}
+// 改過取數的「取數方式」：一律記最初那個（原本 …）
+function fixedNumText(sp: { stem: string; life: string }, oldNum: string) {
+  const first = oldNum.match(/^改取數：.*?（原本 (.*)）$/)?.[1] ?? (oldNum || "未記錄");
+  return `改取數：${sp.stem}干、命宮${sp.life}（原本 ${first}）`;
+}
+// 自己擋下的原因直接顯示，Notion 的錯誤用白話說明
+const why = (e: unknown) => ((e as { local?: boolean })?.local ? String((e as { message?: string }).message) : explain(e as { code?: string; message?: string }));
+// Notion 讀回來的粗體是 <b>，寫回去用 **
+const unbold = (text: string) => text.replace(/<b>(.*?)<\/b>/g, "**$1**");
+// 台灣時間 M/D HH:MM（內頁紀錄用）
+function taipeiStamp() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(new Date())
+    .reduce<Record<string, string>>((all, part) => ({ ...all, [part.type]: part.value }), {});
+  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
 function readLast(): Spread | null {
   try {
     const raw = localStorage.getItem(LAST_KEY);
@@ -533,12 +603,16 @@ export function SpreadView({
   initial,
   onSaved,
   onBack,
+  caseId,
+  onCaseFixed,
 }: {
   mcp: Mcp | null;
   people: GuaPerson[];
   initial: Spread | null;
   onSaved: (caseId: string) => void;
   onBack?: () => void;
+  caseId?: string | null; // 從案例打開的牌陣：那筆案例（存過的盤改取數要寫回去）
+  onCaseFixed?: (sp: Spread) => void;
 }) {
   const fromCase = !!initial;
   const own = people.find((p) => p.group === "自己") ?? people[0];
@@ -657,6 +731,91 @@ export function SpreadView({
     if (!draft) return;
     setDraft(restem(draft, stem, life, fromText(draft)));
   }
+  // 存過的盤改取數（2026/10/31）：牌不動，改寫 Notion 的牌組欄和內文「牌陣」收合標題，內頁記一行；可復原
+  const [pendingFix, setPendingFix] = useState<{ stem: string; life: string } | null>(null);
+  const [caseUndo, setCaseUndo] = useState<{ prev: Spread; prevCards: string; prevBlock: string; nextCards: string; log: string } | null>(null);
+  async function readCase(id: string) {
+    const payload = (await mcp!.callTool(SERVER, "notion-fetch", { id }, { cache: false })).payload;
+    const text = typeof payload === "string" ? payload : String((payload as { text?: string } | undefined)?.text ?? "");
+    const props = text.match(/<properties>\s*([\s\S]*?)\s*<\/properties>/);
+    let cards = "";
+    try {
+      cards = String((props ? JSON.parse(props[1]) : {})["牌組"] ?? "");
+    } catch {
+      cards = "";
+    }
+    const block = findSpreadToggle(pageContent(payload));
+    return { cards, block };
+  }
+  async function applyCaseFix() {
+    if (!mcp || !caseId || !spread || !pendingFix || busy) return;
+    const { stem, life } = pendingFix;
+    setBusy(true);
+    setMessage("");
+    const id = caseId;
+    const shown = spreadText(spread);
+    let step = "";
+    try {
+      step = "讀取案例";
+      const now = await readCase(id);
+      if (now.cards.trim() !== shown) throw { local: true, message: "這筆案例的牌組剛在別處改過，已停下沒有寫；請回案例重新打開牌陣再改。" };
+      if (!now.block) throw { local: true, message: "內文找不到「牌陣」收合標題，沒有寫；請在 Notion 檢查這筆的內文。" };
+      const keep = keepFrom(now.block);
+      const next = restem(spread, stem, life, "");
+      const { fixedFrom: _f, ...clean } = next;
+      const nextSpread = clean as Spread;
+      const nextCards = spreadText(nextSpread);
+      const nextBlock = spreadToggle(nextSpread, { ...keep, num: fixedNumText(nextSpread, keep.num) });
+      const log = `${taipeiStamp()}｜手機頁：改取數（${spread.stem}干、命宮${spread.life}→${stem}干、命宮${life}，牌不動，牌組欄與「牌陣」內文已重算）`;
+      step = "改寫內文";
+      await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_content", content_updates: [{ old_str: now.block, new_str: nextBlock }], allow_async: false });
+      step = "改牌組欄";
+      try {
+        await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_properties", properties: { 牌組: nextCards }, allow_async: false });
+      } catch (e) {
+        // 牌組欄沒寫成：把內文改回去，兩邊保持一致
+        const back = await readCase(id).catch(() => null);
+        if (back?.block) await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_content", content_updates: [{ old_str: back.block, new_str: unbold(now.block) }], allow_async: false }).catch(() => null);
+        throw e;
+      }
+      step = "記紀錄";
+      await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "insert_content", content: log, position: { type: "end" }, allow_async: false });
+      step = "回讀核對";
+      const check = await readCase(id);
+      if (check.cards.trim() !== nextCards || !check.block?.includes(`取數天干：${stem}　命宮在${life}`)) throw { local: true, message: "寫完回讀對不上，請到 Notion 看這筆案例。" };
+      setCaseUndo({ prev: spread, prevCards: shown, prevBlock: unbold(now.block), nextCards, log });
+      setSpread(nextSpread);
+      onCaseFixed?.(nextSpread);
+      setSelected(null);
+      setPendingFix(null);
+      setMessage(`已改成 ${stem}干、命宮${life}，牌組欄和內文都已更新。`);
+    } catch (e) {
+      setPendingFix(null);
+      setMessage(`未儲存（${step}）：${why(e)}`);
+    }
+    setBusy(false);
+  }
+  async function undoCaseFix() {
+    if (!mcp || !caseId || !caseUndo || busy) return;
+    const u = caseUndo;
+    setBusy(true);
+    setMessage("");
+    try {
+      const now = await readCase(caseId);
+      if (now.cards.trim() !== u.nextCards || !now.block) throw { local: true, message: "這筆案例在別處又改過，沒有復原；請到 Notion 看。" };
+      await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_content", content_updates: [{ old_str: now.block, new_str: u.prevBlock }], allow_async: false });
+      await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_properties", properties: { 牌組: u.prevCards }, allow_async: false });
+      await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_content", content_updates: [{ old_str: u.log, new_str: `${u.log}（誤按，已復原）` }], allow_async: false }).catch(() => null);
+      setSpread(u.prev);
+      onCaseFixed?.(u.prev);
+      setSelected(null);
+      setCaseUndo(null);
+      setMessage("已復原，牌組欄和內文改回原本的。");
+    } catch (e) {
+      setMessage(`未復原：${why(e)}`);
+    }
+    setBusy(false);
+  }
   function reset() {
     setDraft(null);
     setSpread(null);
@@ -705,27 +864,14 @@ export function SpreadView({
     setBusy(true);
     setMessage("");
     try {
-      const lines = [
-        `- 類型：${spread.kind === "年運" ? `年運（${spread.year}）` : "問事"}`,
-        `- 取數天干：${spread.stem}　命宮在${spread.life}`,
-        ...(person ? [`- 命盤：${person.name || "未命名"}`] : []),
-        `- 抽牌時間：${timeLabel(spread.at)}`,
-        `- 取數方式：${numText(spread)}`,
-        `- 抽牌方式：${spread.hand ? "手動選牌" : "電腦隨機抽牌"}`,
-        `- 取數干四化：${hitText(drawHits)}`,
-        `- 取數干祿羊陀：${lytText(drawLyt)}`,
-        ...(yearGZ ? [`- ${yearLabel}四化：${hitText(yearHits)}`, `- 年干祿羊陀：${lytText(yearLyt)}`] : []),
-        `- 煞忌兩個以上（牌＋取數干${yearGZ ? "＋年干" : ""}）：${shaJiText(atLeastTwo(shaJiMap(spread, [drawLayer, ...(yearGZ ? [yearLayer] : [])])))}`,
-        `- 對宮線煞忌兩顆以上（只算牌）：${axisMap(spread, shaJiMap(spread, [])).map((a) => `${a.pair.join("－")}（${a.list.join("、")}）`).join("；") || "沒有"}`,
-      ];
-      const board = [
-        ...spread.cells.map((c) => `- **${c.palace}（${c.stem}${c.branch}）**：${cardText(c.main)}｜${cardText(c.minor)}　${c.stem}干飛：${hitText(flyFrom(spread, c.stem))}`),
-        `- **身宮**：${cardText(spread.body)}　**長生**：${cardText(spread.stage)}`,
-      ];
-      // 牌陣和十二宮都寫成可收合的標題（十二宮收在牌陣裡面）
       const content = [
         `## 提問\n${title}`,
-        toggleBlock(2, "牌陣", `${lines.join("\n")}\n${toggleBlock(3, "十二宮", board.join("\n"))}`),
+        spreadToggle(spread, {
+          person: person ? person.name || "未命名" : null,
+          time: timeLabel(spread.at),
+          num: numText(spread),
+          how: spread.hand ? "手動選牌" : "電腦隨機抽牌",
+        }),
         "## 第一版判斷\n",
         "## 討論修正\n",
       ].join("\n");
@@ -1154,6 +1300,27 @@ export function SpreadView({
               </button>
             )}
             {!fromCase && savedId === null && <FixNum key={`${spread.at}${spread.stem}${spread.life}`} stem={spread.stem} life={spread.life} onApply={fixSpread} />}
+            {fromCase && caseId && mcp && !pendingFix && !busy && (
+              <FixNum key={`case${spread.stem}${spread.life}`} stem={spread.stem} life={spread.life} onApply={(stem, life) => setPendingFix({ stem, life })} />
+            )}
+            {fromCase && pendingFix && (
+              <span role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-apricot-soft px-3 py-2 text-sm text-apricot-deep">
+                這盤已存成案例。改成 {pendingFix.stem}干、命宮{pendingFix.life}，會改寫 Notion 的牌組欄和內文「牌陣」，牌不動。確定嗎？
+                <button type="button" disabled={busy} onClick={applyCaseFix} className={`rounded-full bg-ink px-3 py-1 text-xs text-paper-light ${FOCUS}`}>
+                  {busy ? "寫入中…" : "確定寫入"}
+                </button>
+                {!busy && (
+                  <button type="button" onClick={() => setPendingFix(null)} className={`text-xs underline underline-offset-4 ${FOCUS}`}>
+                    取消
+                  </button>
+                )}
+              </span>
+            )}
+            {fromCase && caseUndo && !pendingFix && (
+              <button type="button" disabled={busy} onClick={undoCaseFix} className={`text-sm text-ink-soft underline underline-offset-4 ${FOCUS}`}>
+                {busy ? "復原中…" : "復原改取數"}
+              </button>
+            )}
             {!fromCase && spread.hand && savedId === null && (
               <button type="button" onClick={editPick} className={`text-sm text-ink-soft underline underline-offset-4 ${FOCUS}`}>
                 改牌

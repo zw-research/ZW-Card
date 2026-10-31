@@ -345,6 +345,9 @@ export function ReadingItem({
 
 // 複製給小P用的短時間「10/28 20:31」
 export function shortTime(iso: string) {
+  // 只有日期（從案例打開的盤）就只寫日期，不要冒出時區換算的 08:00
+  const day = iso.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  if (day) return `${Number(day[1])}/${Number(day[2])}`;
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
