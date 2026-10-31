@@ -153,7 +153,32 @@ function fetchText(payload: unknown) {
   return typeof payload === "string" ? payload : String((payload as { text?: unknown } | undefined)?.text ?? "");
 }
 
-function pageContent(payload: unknown) {
+// fetch 帶 include_file_urls 時，Notion 會附上圖片的暫時連結（約 5 分鐘內有效）
+export type Images = Record<string, string>;
+export function pageImages(payload: unknown): Images {
+  const refs = (payload as { references?: unknown } | undefined)?.references;
+  return refs && typeof refs === "object" ? (refs as Images) : {};
+}
+
+// 內文裡的圖：有暫時連結就直接顯示；載入失敗（連結過期或被擋）就改成提示
+function MdImage({ src, onReload }: { src: string; onReload?: () => void }) {
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <p className="text-sm text-ink-soft">
+        圖片載入不了（連結過期或被擋）{onReload ? "，" : "，到 Notion 打開看。"}
+        {onReload && (
+          <button type="button" onClick={onReload} className={`underline underline-offset-4 ${FOCUS}`}>
+            重新讀取
+          </button>
+        )}
+      </p>
+    );
+  return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} className="max-w-full rounded-md border border-line" />;
+}
+const imageSource = (line: string) => line.match(/^<image\s[^>]*source="([^"]+)"/)?.[1] ?? line.match(/^!\[[^\]]*\]\(([^)\s]+)/)?.[1] ?? null;
+
+export function pageContent(payload: unknown) {
   const match = fetchText(payload).match(/<content>\n?([\s\S]*?)\n?<\/content>/);
   return match ? match[1] : "";
 }
@@ -392,6 +417,43 @@ function CardChips({ text, linked = false }: { text: string; linked?: boolean })
         );
       })}
     </span>
+  );
+}
+
+// 案例內容頁：牌組直接顯示牌卡小圖（倒牌轉 180 度，圖下小字牌名，點牌看大圖）；有讀不懂的寫法就整組退回文字標籤
+function CardThumbs({ text }: { text: string }) {
+  const [zoom, setZoom] = useState<Pick | null>(null);
+  if (!text.trim()) return null;
+  const groups = text
+    .split(GROUP_SPLIT)
+    .filter((group) => group.trim())
+    .map((raw) => {
+      const { label, body } = splitLabel(raw);
+      return { label, picks: body.split(/｜|＋/).map(parsePart) };
+    });
+  if (!groups.length || groups.some((group) => group.picks.some((pick) => !pick))) return <CardChips text={text} linked />;
+  return (
+    <div className="flex flex-col gap-2">
+      {groups.map((group, index) => (
+        <div key={index} className="flex flex-wrap items-end gap-1.5">
+          {group.label && <span className="w-full text-xs text-ink-soft">{group.label}</span>}
+          {group.picks.map((pick, i) => {
+            const thumb = cardThumb(pick!.name);
+            return (
+              <button key={i} type="button" onClick={() => setZoom(pick)} aria-label={`${pickText(pick!)}，看大圖`} className={`flex w-14 flex-col items-center gap-0.5 ${FOCUS}`}>
+                {thumb ? (
+                  <img src={thumb} alt={pick!.name} className={`aspect-[440/800] w-14 rounded-[3px] object-cover ${isReversed(pick!) ? "rotate-180" : ""}`} />
+                ) : (
+                  <span className="flex aspect-[440/800] w-14 items-center justify-center rounded-[3px] bg-paper text-[10px] text-ink-soft">{pick!.name}</span>
+                )}
+                <span className="text-[10px] leading-tight whitespace-nowrap text-ink-soft">{pickText(pick!)}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+      {zoom && <CardZoom card={{ name: zoom.name, reversed: isReversed(zoom) }} onClose={() => setZoom(null)} />}
+    </div>
   );
 }
 
@@ -711,9 +773,9 @@ function splitFeedback(text: string) {
 const TOGGLE_OPEN = /^\s*<(toggle|details)\b[^>]*>\s*$/;
 const TOGGLE_CLOSE = /^\s*<\/(toggle|details)>\s*$/;
 
-function Markdown({ text, links }: { text: string; links?: Links }) {
+export function Markdown({ text, links, images, onReload }: { text: string; links?: Links; images?: Images; onReload?: () => void }) {
   const blocks: ReactNode[] = [];
-  let images = 0;
+  let hidden = 0;
   const lines = text.split("\n");
   for (let index = 0; index < lines.length; index++) {
     if (TOGGLE_OPEN.test(lines[index])) {
@@ -738,7 +800,7 @@ function Markdown({ text, links }: { text: string; links?: Links }) {
             {inline(title.replace(/^#{1,4}\s+/, ""), links)}
           </summary>
           <div className="mt-2">
-            <Markdown text={rest.map((l) => l.replace(/^\t/, "")).join("\n")} links={links} />
+            <Markdown text={rest.map((l) => l.replace(/^\t/, "")).join("\n")} links={links} images={images} onReload={onReload} />
           </div>
         </details>,
       );
@@ -749,7 +811,10 @@ function Markdown({ text, links }: { text: string; links?: Links }) {
     const line = raw.trimEnd();
     if (!line.trim()) continue;
     if (/^!\[[^\]]*\]\(|^<image\s|^<file\s/.test(line.trim())) {
-      images += 1;
+      const source = imageSource(line.trim());
+      const url = source ? images?.[source] ?? (/^https?:/.test(source) ? source : null) : null;
+      if (url) blocks.push(<MdImage key={index} src={url} onReload={onReload} />);
+      else hidden += 1;
       continue;
     }
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
@@ -792,7 +857,7 @@ function Markdown({ text, links }: { text: string; links?: Links }) {
   return (
     <div className="flex flex-col gap-1.5 leading-7">
       {blocks.length ? blocks : <p className="text-ink-soft">（還沒有內容）</p>}
-      {images > 0 && <p className="text-sm text-ink-soft">內文裡有 {images} 張圖片，到 Notion 打開看。</p>}
+      {hidden > 0 && <p className="text-sm text-ink-soft">內文裡有 {hidden} 個圖片或檔案，到 Notion 打開看。</p>}
     </div>
   );
 }
@@ -1130,6 +1195,7 @@ export function CasesView({
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const [mode, setMode] = useState<"list" | "new" | "edit">("list");
   const [body, setBody] = useState<string | null>(null);
+  const [bodyImages, setBodyImages] = useState<Images>({});
   const [bodyError, setBodyError] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -1192,7 +1258,8 @@ export function CasesView({
       setBody(null);
       setBodyError("");
       try {
-        const result = await mcp.callTool(SERVER, "notion-fetch", { id: item.url }, { cache: false });
+        const result = await mcp.callTool(SERVER, "notion-fetch", { id: item.url, include_file_urls: true }, { cache: false });
+        setBodyImages(pageImages(result.payload));
         setBody(pageContent(result.payload));
       } catch (e) {
         setBodyError(explain(e as McpError));
@@ -1487,7 +1554,7 @@ export function CasesView({
                 <p className="text-xs text-ink-soft">牌陣：待確認（牌組文字格式不完整）</p>
               )
             ) : (
-              <CardChips text={open.cards} linked />
+              <CardThumbs key={open.id} text={open.cards} />
             )}
             {open.gua && (
               <button
@@ -1507,7 +1574,7 @@ export function CasesView({
           <section className="flex flex-col gap-2 rounded-xl bg-paper p-3">
             <h3 className={LABEL}>驗證回饋</h3>
             {body === null && !bodyError && <p className="text-sm text-ink-soft">讀取中…</p>}
-            {split && (split.feedback ? <Markdown key={open.id} text={split.feedback} links={links} /> : <p className="text-sm text-ink-soft">還沒有回饋。</p>)}
+            {split && (split.feedback ? <Markdown key={open.id} text={split.feedback} links={links} images={bodyImages} onReload={() => loadBody(open)} /> : <p className="text-sm text-ink-soft">還沒有回饋。</p>)}
             <div className="flex gap-2">
               <input
                 value={feedback}
@@ -1539,7 +1606,7 @@ export function CasesView({
             </div>
             {bodyError && <p className="text-sm text-danger">{bodyError}</p>}
             {body === null && !bodyError && <p className="text-sm text-ink-soft">讀取內容…</p>}
-            {split && <Markdown key={open.id} text={split.rest} links={links} />}
+            {split && <Markdown key={open.id} text={split.rest} links={links} images={bodyImages} onReload={() => loadBody(open)} />}
           </section>
 
           <section className="flex flex-col gap-2">

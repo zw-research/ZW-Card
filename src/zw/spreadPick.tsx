@@ -9,7 +9,7 @@ import { FOCUS, TONES } from "./ui";
 
 export type Card = { name: string; reversed: boolean };
 export type DraftCell = { palace: string; branch: string; stem: string; main: Card | null; minor: Card | null };
-export type Draft = { stem: string; life: string; cells: DraftCell[]; body: Card | null; stage: Card | null; kind: "問事" | "年運"; question: string; year: string; at: string; nums?: [string, string] };
+export type Draft = { stem: string; life: string; cells: DraftCell[]; body: Card | null; stage: Card | null; kind: "問事" | "年運"; question: string; year: string; at: string; nums?: [string, string]; fixedFrom?: string };
 
 const POS: Record<string, [number, number]> = {
   巳: [1, 1], 午: [1, 2], 未: [1, 3], 申: [1, 4], 辰: [2, 1], 酉: [2, 4], 卯: [3, 1], 戌: [3, 4], 寅: [4, 1], 丑: [4, 2], 子: [4, 3], 亥: [4, 4],

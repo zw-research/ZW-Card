@@ -88,6 +88,86 @@ export function palaceStem(yearStem: string, branch: string) {
   return STEMS[(start + offset) % 10];
 }
 
+// 改取數（2026/10/31）：還沒存的十二宮牌陣／選牌草稿，改取數天干和命宮；牌留在原本的宮位，只重排地支和宮干
+type Restemable = { stem: string; life: string; nums?: [string, string]; fixedFrom?: string; cells: { palace: string; branch: string; stem: string }[] };
+function restem<T extends Restemable>(sp: T, stem: string, life: string, from: string): T {
+  const lifeIndex = BRANCHES.indexOf(life);
+  const { nums: _nums, ...rest } = sp;
+  return {
+    ...rest,
+    stem,
+    life,
+    fixedFrom: sp.fixedFrom ?? from,
+    cells: sp.cells.map((c, k) => {
+      const branch = BRANCHES[(lifeIndex - k + 12) % 12];
+      return { ...c, branch, stem: palaceStem(stem, branch) };
+    }),
+  } as T;
+}
+// 取數方式的文字（存案例、改取數時記原本的）
+function numText(sp: { stem: string; life: string; nums?: [string, string]; fixedFrom?: string }) {
+  if (sp.fixedFrom) return `改取數：${sp.stem}干、命宮${sp.life}（原本 ${sp.fixedFrom}）`;
+  return sp.nums
+    ? `手動輸入 ${sp.nums[0]}、${sp.nums[1]}（${sp.nums[0]} ÷ 10 餘 ${BigInt(sp.nums[0]) % 10n} → ${sp.stem}；${sp.nums[1]} ÷ 12 餘 ${BigInt(sp.nums[1]) % 12n} → 命宮${sp.life}）`
+    : "電腦隨機";
+}
+const fromText = (sp: { stem: string; life: string; nums?: [string, string] }) => (sp.nums ? numText(sp) : `電腦隨機 ${sp.stem}干、命宮${sp.life}`);
+// 盤下的小按鈕「改取數」：展開兩個下拉（天干、命宮），改了才套用
+function FixNum({ stem, life, onApply }: { stem: string; life: string; onApply: (stem: string, life: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [s, setS] = useState(stem);
+  const [l, setL] = useState(life);
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setS(stem);
+          setL(life);
+          setOpen(true);
+        }}
+        className={`w-fit text-sm text-ink-soft underline underline-offset-4 ${FOCUS}`}
+      >
+        改取數
+      </button>
+    );
+  const sel = `rounded-md border border-line-strong bg-paper-light px-1.5 py-1 text-sm ${FOCUS}`;
+  return (
+    <span className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-paper px-3 py-2 text-sm">
+      <label className="flex items-center gap-1">
+        天干
+        <select aria-label="取數天干" value={s} onChange={(e) => setS(e.target.value)} className={sel}>
+          {[...STEMS].map((x) => (
+            <option key={x}>{x}</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-1">
+        命宮
+        <select aria-label="命宮地支" value={l} onChange={(e) => setL(e.target.value)} className={sel}>
+          {[...BRANCHES].map((x) => (
+            <option key={x}>{x}</option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(false);
+          if (s !== stem || l !== life) onApply(s, l);
+        }}
+        className={`rounded-full bg-ink px-3 py-1 text-xs text-paper-light ${FOCUS}`}
+      >
+        確定
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className={`text-xs underline underline-offset-4 ${FOCUS}`}>
+        取消
+      </button>
+      <span className="w-full text-xs text-ink-soft">牌留在原本的宮位，只重排宮位地支和宮干</span>
+    </span>
+  );
+}
+
 type Card = { name: string; reversed: boolean };
 type Cell = { palace: string; branch: string; stem: string; main: Card; minor: Card };
 export type Spread = {
@@ -103,6 +183,7 @@ export type Spread = {
   nums?: [string, string]; // 手動取數的兩個數（數一→取數天干、數二→命宮地支）；電腦隨機時沒有
   saved?: string; // 已存成案例的案例 ID（只記在瀏覽器，重開頁面才知道這盤存過，不會重複存）
   hand?: boolean; // 手動選牌（存案例時內文記「抽牌方式：手動選牌」）
+  fixedFrom?: string; // 改過取數（2026/10/31）：記原本的取數方式，存案例時寫進「取數方式」
 };
 
 function shuffle<T>(list: T[]) {
@@ -564,6 +645,18 @@ export function SpreadView({
     writeLast(null);
     setSelected(null);
   }
+  // 改取數：牌不動，只換天干、命宮（四化、煞忌跟著重算）
+  function fixSpread(stem: string, life: string) {
+    if (!spread || savedId !== null) return;
+    const next = restem(spread, stem, life, fromText(spread));
+    setSpread(next);
+    writeLast(next);
+    setSelected(null);
+  }
+  function fixDraft(stem: string, life: string) {
+    if (!draft) return;
+    setDraft(restem(draft, stem, life, fromText(draft)));
+  }
   function reset() {
     setDraft(null);
     setSpread(null);
@@ -600,10 +693,6 @@ export function SpreadView({
   // 對宮線紅點一律只算牌，按了取數干／年干也照樣留著
   const axes = spread ? axisMap(spread, shaJiMap(spread, [])) : [];
   const dotted = new Set(axes.flatMap((a) => a.pair));
-  const numText = (sp: Spread) =>
-    sp.nums
-      ? `手動輸入 ${sp.nums[0]}、${sp.nums[1]}（${sp.nums[0]} ÷ 10 餘 ${BigInt(sp.nums[0]) % 10n} → ${sp.stem}；${sp.nums[1]} ÷ 12 餘 ${BigInt(sp.nums[1]) % 12n} → 命宮${sp.life}）`
-      : "電腦隨機";
   const lytText = (where: string[]) => LYT.map((name, i) => `${name}→${where[i]}`).join("、");
   const flyFor = (card: Card) => flying.filter((h) => starsOf(card.name).includes(h.star)).map((h) => h.index);
 
@@ -684,6 +773,7 @@ export function SpreadView({
       {!spread && draft && (
         <section className="flex flex-col gap-2">
           <SpreadPicker draft={draft} onChange={setDraft} onDone={finishPick} title={draft.question || (draft.kind === "年運" ? `${draft.year} 年運` : "牌陣")} />
+          <FixNum key={`${draft.at}${draft.stem}${draft.life}`} stem={draft.stem} life={draft.life} onApply={fixDraft} />
           {confirmDrop ? (
             <span role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-apricot-soft px-3 py-2 text-sm text-apricot-deep">
               放棄這盤手選的牌，回到抽牌前？
@@ -1063,6 +1153,7 @@ export function SpreadView({
                 到案例看 →
               </button>
             )}
+            {!fromCase && savedId === null && <FixNum key={`${spread.at}${spread.stem}${spread.life}`} stem={spread.stem} life={spread.life} onApply={fixSpread} />}
             {!fromCase && spread.hand && savedId === null && (
               <button type="button" onClick={editPick} className={`text-sm text-ink-soft underline underline-offset-4 ${FOCUS}`}>
                 改牌
