@@ -1,7 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
+import { toCanvas } from "html-to-image";
 import { isReversed, orientMark } from "./cards";
 import { cardFull, cardThumb } from "./cardImages";
-import { FOCUS } from "./ui";
+import { FOCUS, SaveImage, snapName } from "./ui";
 
 // 牌陣的牌卡圖（2026/10/28）：
 // 1. 文字盤點牌 → CardZoom 跳出整張大圖（倒牌圖轉 180 度），可順手點選這宮看飛化
@@ -66,8 +68,93 @@ export function CardZoom({ card, palace, selected, onSelect, onClose }: { card: 
   );
 }
 
+// 圖卡盤面（畫面上和存圖共用）：card 決定每張牌怎麼畫
+function GalleryGrid({ cells, body, stage, cw, bw, card }: { cells: Cell[]; body: Card; stage: Card; cw: number; bw: number; card: (c: Card, w: number) => ReactNode }) {
+  return (
+    <div className="grid flex-none" style={{ gridTemplateColumns: "repeat(4, auto)", gridTemplateRows: "repeat(4, auto)", gap: GAP }}>
+      {cells.map((c) => {
+        const [row, col] = POS[c.branch];
+        return (
+          <div key={c.palace} className="flex" style={{ gridRow: row, gridColumn: col, gap: PAIR_GAP }}>
+            {card(c.main, cw)}
+            {card(c.minor, cw)}
+          </div>
+        );
+      })}
+      <div className="relative flex items-center justify-center gap-1" style={{ gridRow: "2 / 4", gridColumn: "2 / 4", padding: MARGIN }}>
+        {card(body, bw)}
+        {card(stage, bw)}
+        {cells.map((c) => {
+          const [x, y] = LABEL_AT[c.branch];
+          const dx = x === 0 ? `${MARGIN / 2}px` : x === 100 ? `${-MARGIN / 2}px` : "0px";
+          const dy = y === 0 ? `${MARGIN / 2}px` : y === 100 ? `${-MARGIN / 2}px` : "0px";
+          const tone = c.palace === "命宮" ? "rounded-[3px] bg-ink px-[3px] py-[2px] text-paper-light" : SANFANG.includes(c.palace) ? "font-medium text-apricot-deep" : "text-ink-soft";
+          return (
+            <span
+              key={c.palace}
+              aria-hidden
+              className={`pointer-events-none absolute text-xs leading-none whitespace-nowrap ${tone}`}
+              style={{ left: `calc(${x}% + ${dx})`, top: `calc(${y}% + ${dy})`, transform: "translate(-50%, -50%)" }}
+            >
+              {SHORT[c.palace] ?? c.palace}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+const sizesFor = (cw: number) => {
+  const ch = 2 * cw * RATIO + GAP - 2 * MARGIN;
+  return Math.floor(Math.min(ch / RATIO, (4 * cw + 2 * PAIR_GAP + GAP - 2 * MARGIN - 4) / 2));
+};
+
+// 存圖用的圖卡盤（2026/11/01）：在畫面外用原圖（440×800）排一張大的盤，產生 PNG 後拿掉
+export async function galleryImage(cells: Cell[], body: Card, stage: Card, caption: string): Promise<Blob | null> {
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:-10000px;top:0;";
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const cw = 96;
+  const shot = (c: Card, w: number) => {
+    const src = cardFull(c.name);
+    return (
+      <span className="block overflow-hidden rounded-[3px] bg-line" style={{ width: w, height: Math.round(w * RATIO) }}>
+        {src ? (
+          <img src={src} alt="" className={`block h-full w-full object-cover ${isReversed(c) ? "rotate-180" : ""}`} />
+        ) : (
+          <span className={`flex h-full items-center justify-center text-sm text-ink ${isReversed(c) ? "rotate-180" : ""}`}>{c.name}</span>
+        )}
+      </span>
+    );
+  };
+  try {
+    await new Promise<void>((done) => {
+      root.render(
+        <div ref={() => done()} className="inline-flex flex-col gap-2 bg-paper p-3">
+          {caption && <span className="text-sm text-ink">{caption}</span>}
+          <GalleryGrid cells={cells} body={body} stage={stage} cw={cw} bw={sizesFor(cw)} card={shot} />
+        </div>,
+      );
+    });
+    const node = host.firstElementChild as HTMLElement;
+    // 等牌卡原圖都載入
+    await Promise.all(
+      [...node.querySelectorAll("img")].map((img) => (img.complete ? null : new Promise((ok) => ((img.onload = ok), (img.onerror = ok))))),
+    );
+    const opts = { pixelRatio: 2, backgroundColor: "#f6eee3", skipFonts: true, cacheBust: false };
+    await toCanvas(node, opts).catch(() => null); // Safari 第一次常漏圖，先畫一次暖身
+    const canvas = await toCanvas(node, opts);
+    // 牌卡是照片，存 JPEG（約 1MB），PNG 會到 5MB
+    return await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.9));
+  } finally {
+    root.unmount();
+    host.remove();
+  }
+}
+
 // 全螢幕小圖盤
-export function CardGallery({ cells, body, stage, onClose }: { cells: Cell[]; body: Card; stage: Card; onClose: () => void }) {
+export function CardGallery({ cells, body, stage, onClose, caption = "", at = "" }: { cells: Cell[]; body: Card; stage: Card; onClose: () => void; caption?: string; at?: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const back = useRef<HTMLButtonElement>(null);
   const [size, setSize] = useState({ cw: 40, bw: 60, land: false });
@@ -139,42 +226,18 @@ export function CardGallery({ cells, body, stage, onClose }: { cells: Cell[]; bo
     >
       <div className="flex items-center justify-between gap-2 px-1">
         <span className="text-xs text-ink-soft">圖卡・點牌在空白處看大圖</span>
+        <span className="ml-auto" />
+        <SaveImage
+          make={() => galleryImage(cells, body, stage, caption)}
+          filename={snapName(at, "圖卡").replace(/\.png$/, ".jpg")}
+          className="rounded-full border border-line-strong bg-paper-light px-3.5 py-1 text-[13px] text-ink"
+        />
         <button ref={back} type="button" onClick={onClose} className={`rounded-full border border-line-strong bg-paper-light px-3.5 py-1 text-[13px] text-ink ${FOCUS}`}>
           回文字盤
         </button>
       </div>
       <div ref={stageRef} className={`flex min-h-0 flex-1 items-center gap-2 ${size.land ? "flex-row" : "flex-col"}`}>
-        <div className="grid flex-none" style={{ gridTemplateColumns: "repeat(4, auto)", gridTemplateRows: "repeat(4, auto)", gap: GAP }}>
-          {cells.map((c) => {
-            const [row, col] = POS[c.branch];
-            return (
-              <div key={c.palace} className="flex" style={{ gridRow: row, gridColumn: col, gap: PAIR_GAP }}>
-                {thumb(c.main, size.cw)}
-                {thumb(c.minor, size.cw)}
-              </div>
-            );
-          })}
-          <div className="relative flex items-center justify-center gap-1" style={{ gridRow: "2 / 4", gridColumn: "2 / 4", padding: MARGIN }}>
-            {thumb(body, size.bw)}
-            {thumb(stage, size.bw)}
-            {cells.map((c) => {
-              const [x, y] = LABEL_AT[c.branch];
-              const dx = x === 0 ? `${MARGIN / 2}px` : x === 100 ? `${-MARGIN / 2}px` : "0px";
-              const dy = y === 0 ? `${MARGIN / 2}px` : y === 100 ? `${-MARGIN / 2}px` : "0px";
-              const tone = c.palace === "命宮" ? "rounded-[3px] bg-ink px-[3px] py-[2px] text-paper-light" : SANFANG.includes(c.palace) ? "font-medium text-apricot-deep" : "text-ink-soft";
-              return (
-                <span
-                  key={c.palace}
-                  aria-hidden
-                  className={`pointer-events-none absolute text-xs leading-none whitespace-nowrap ${tone}`}
-                  style={{ left: `calc(${x}% + ${dx})`, top: `calc(${y}% + ${dy})`, transform: "translate(-50%, -50%)" }}
-                >
-                  {SHORT[c.palace] ?? c.palace}
-                </span>
-              );
-            })}
-          </div>
-        </div>
+        <GalleryGrid cells={cells} body={body} stage={stage} cw={size.cw} bw={size.bw} card={thumb} />
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center gap-1.5" style={size.land ? { height: "100%" } : undefined}>
           {big ? (
             <img src={big} alt={pick.name} className={`max-h-[calc(100%-26px)] max-w-full rounded-[10px] shadow-[0_4px_18px_rgba(40,32,26,0.25)] ${isReversed(pick) ? "rotate-180" : ""}`} />

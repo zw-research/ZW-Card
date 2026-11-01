@@ -5,8 +5,9 @@ import { explain, normId, pageContent, type Mcp } from "./cases";
 import { GUA_PALACES, TIMES, toggleBlock } from "./chart";
 import { branchOf, randomIndex, stemOf } from "./draw";
 import type { GuaPerson } from "./gua";
-import { BUTTON_GHOST, BUTTON_PRIMARY, CopyBox, FOCUS, INPUT, shortTime } from "./ui";
+import { BUTTON_GHOST, BUTTON_PRIMARY, CopyBox, FOCUS, INPUT, SaveImage, shortTime, snapName } from "./ui";
 import { CardGallery, CardZoom } from "./cardView";
+import { toBlob } from "html-to-image";
 import { SpreadPicker, pickedCount, type Draft } from "./spreadPick";
 import { SMALL_NAMES, SmallSpread, newSmall, type Small } from "./smallSpread";
 import type { LayoutId } from "./cases";
@@ -663,6 +664,7 @@ export function SpreadView({
   const [confirmReset, setConfirmReset] = useState(false);
   const [zoom, setZoom] = useState<{ card: Card; palace?: string } | null>(null); // 點牌看大圖
   const [gallery, setGallery] = useState(false); // 圖卡全螢幕
+  const boardRef = useRef<HTMLDivElement>(null); // 存圖：文字盤
   const [handPick, setHandPick] = useState(false); // 牌：電腦隨機／手動選牌
   const [draft, setDraftState] = useState<Draft | null>(() => (initial ? null : readDraft()));
   const [confirmDrop, setConfirmDrop] = useState(false);
@@ -1114,7 +1116,7 @@ export function SpreadView({
       {spread && (
         <>
           <FitBoard watch={spread.at} fresh={justDrew}>
-          <div data-board className="grid grid-cols-4 grid-rows-[repeat(4,auto)] gap-px border border-line bg-line">
+          <div ref={boardRef} data-board className="grid grid-cols-4 grid-rows-[repeat(4,auto)] gap-px border border-line bg-line">
             {spread.cells.map((c) => {
               const [row, col] = POS[c.branch];
               const isSel = selected === c.palace;
@@ -1226,6 +1228,19 @@ export function SpreadView({
           {/* 圖卡：全螢幕小圖盤；點牌看大圖 */}
           <div className="-mt-2 flex items-center justify-between gap-2">
             <span className="text-xs text-ink-soft">點牌看牌卡大圖・點宮名或空白處看飛化</span>
+            <span className="ml-auto" />
+            <SaveImage
+              make={async () => {
+                const node = boardRef.current;
+                if (!node) return null;
+                // 照畫面上現在的樣子（有按開的取X／年X、點選的宮都會在圖上），放大 3 倍輸出
+                const opts = { pixelRatio: 3, backgroundColor: "#fffdfa", skipFonts: true };
+                await toBlob(node, opts).catch(() => null);
+                return toBlob(node, opts);
+              }}
+              filename={snapName(spread.at, "文字盤")}
+              className="rounded-full border border-line-strong bg-paper-light px-3.5 py-1 text-[13px] text-ink"
+            />
             <button type="button" onClick={() => setGallery(true)} className={`rounded-full bg-ink px-3.5 py-1 text-[13px] text-paper-light ${FOCUS}`}>
               圖卡
             </button>
@@ -1246,7 +1261,7 @@ export function SpreadView({
               onClose={() => setZoom(null)}
             />
           )}
-          {gallery && <CardGallery cells={spread.cells} body={spread.body} stage={spread.stage} onClose={() => setGallery(false)} />}
+          {gallery && <CardGallery cells={spread.cells} body={spread.body} stage={spread.stage} caption={`${title}　${shortTime(spread.at)}`} at={spread.at} onClose={() => setGallery(false)} />}
 
           {/* 說明：整塊可收合，預設收起；每個四化一行，不在盤上的用淡灰字 */}
           <details className="group rounded-xl bg-paper-light px-3 py-2 text-xs text-ink-soft">

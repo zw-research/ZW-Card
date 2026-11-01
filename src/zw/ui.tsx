@@ -378,3 +378,64 @@ export function CopyBox({ text, label = "複製牌組文字", clamp = false }: {
     </div>
   );
 }
+
+// 存圖（2026/11/01）：把畫面上的盤面產生成高解析 PNG，交給 claude.ai 的「下載」讓本人存檔（手機會跳分享／存檔）
+// 網頁版沒有 window.claude，就用一般下載。產生圖片在手機上做，不用 Notion、不花額度。
+type Downloads = { save: (r: { filename: string; data: Blob }) => Promise<unknown> };
+async function saveBlob(blob: Blob, filename: string) {
+  const claude = (window as unknown as { claude?: { use: (name: string) => Promise<unknown> } }).claude;
+  if (claude) {
+    const dl = (await claude.use("downloads").catch(() => null)) as Downloads | null;
+    if (!dl) throw { code: "unavailable" };
+    await dl.save({ filename, data: blob });
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+// 檔名：牌陣-1101-1020-圖卡.png（只留中英數，避免存檔時被改名）
+export function snapName(at: string, kind: string) {
+  const d = new Date(at);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = isNaN(d.getTime()) ? "" : `-${pad(d.getMonth() + 1)}${pad(d.getDate())}${/T/.test(at) ? `-${pad(d.getHours())}${pad(d.getMinutes())}` : ""}`;
+  return `牌陣${stamp}-${kind}.png`;
+}
+export function SaveImage({ make, filename, className = "" }: { make: () => Promise<Blob | null>; filename: string; className?: string }) {
+  const [state, setState] = useState<"" | "busy" | "done" | string>("");
+  async function go() {
+    if (state === "busy") return;
+    setState("busy");
+    try {
+      const blob = await make();
+      if (!blob) throw { code: "make" };
+      await saveBlob(blob, filename);
+      setState("done");
+      setTimeout(() => setState((s) => (s === "done" ? "" : s)), 4000);
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      setState(
+        code === "declined"
+          ? ""
+          : code === "rate_limited"
+            ? "存檔視窗還開著，等一下再按"
+            : code === "make"
+              ? "圖片產生不出來，可以改用截圖"
+              : "這裡不能存檔：到頁面上方的權限選單打開「下載」，或改用截圖",
+      );
+    }
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button type="button" onClick={go} disabled={state === "busy"} className={`${className} ${FOCUS}`}>
+        {state === "busy" ? "產生中…" : state === "done" ? "已存" : "存圖"}
+      </button>
+      {state && state !== "busy" && state !== "done" && <span className="text-xs text-danger">{state}</span>}
+    </span>
+  );
+}
