@@ -30,6 +30,7 @@ export type Small = {
   year: string;
   at: string;
   nums?: [string, string];
+  chosen?: boolean; // 取數直接選干支（2026/11/01）
   hand: boolean; // 手動選牌；false＝電腦隨機抽（抽完不能改）
   saved?: string; // 已存成案例的案例 ID
 };

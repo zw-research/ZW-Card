@@ -93,7 +93,7 @@ export function palaceStem(yearStem: string, branch: string) {
 type Restemable = { stem: string; life: string; nums?: [string, string]; fixedFrom?: string; cells: { palace: string; branch: string; stem: string }[] };
 function restem<T extends Restemable>(sp: T, stem: string, life: string, from: string): T {
   const lifeIndex = BRANCHES.indexOf(life);
-  const { nums: _nums, ...rest } = sp;
+  const { nums: _nums, chosen: _chosen, ...rest } = sp as T & { chosen?: boolean };
   return {
     ...rest,
     stem,
@@ -112,13 +112,14 @@ function refix<T extends Restemable & { year: string; kind: string }>(sp: T, ste
   return sp.kind === "年運" && year && year !== sp.year ? { ...next, year } : next;
 }
 // 取數方式的文字（存案例、改取數時記原本的）
-function numText(sp: { stem: string; life: string; nums?: [string, string]; fixedFrom?: string }) {
+function numText(sp: { stem: string; life: string; nums?: [string, string]; fixedFrom?: string; chosen?: boolean }) {
   if (sp.fixedFrom) return `改取數：${sp.stem}干、命宮${sp.life}（原本 ${sp.fixedFrom}）`;
+  if (sp.chosen) return `直接選干支：${sp.stem}干、命宮${sp.life}`;
   return sp.nums
     ? `手動輸入 ${sp.nums[0]}、${sp.nums[1]}（${sp.nums[0]} ÷ 10 餘 ${BigInt(sp.nums[0]) % 10n} → ${sp.stem}；${sp.nums[1]} ÷ 12 餘 ${BigInt(sp.nums[1]) % 12n} → 命宮${sp.life}）`
     : "電腦隨機";
 }
-const fromText = (sp: { stem: string; life: string; nums?: [string, string] }) => (sp.nums ? numText(sp) : `電腦隨機 ${sp.stem}干、命宮${sp.life}`);
+const fromText = (sp: { stem: string; life: string; nums?: [string, string]; chosen?: boolean }) => (sp.nums || sp.chosen ? numText(sp) : `電腦隨機 ${sp.stem}干、命宮${sp.life}`);
 // 盤下的小按鈕「改取數」：展開兩個下拉（天干、命宮），改了才套用
 // year：年運的盤才傳，多一格年份（2026/11/01）
 function FixNum({ stem, life, year, onApply }: { stem: string; life: string; year?: string; onApply: (stem: string, life: string, year?: string) => void }) {
@@ -211,6 +212,7 @@ export type Spread = {
   saved?: string; // 已存成案例的案例 ID（只記在瀏覽器，重開頁面才知道這盤存過，不會重複存）
   hand?: boolean; // 手動選牌（存案例時內文記「抽牌方式：手動選牌」）
   fixedFrom?: string; // 改過取數（2026/10/31）：記原本的取數方式，存案例時寫進「取數方式」
+  chosen?: boolean; // 取數直接選干支（2026/11/01）
 };
 
 function shuffle<T>(list: T[]) {
@@ -225,9 +227,10 @@ function shuffle<T>(list: T[]) {
 const flip = (name: string): Card => fixOrient({ name, reversed: randomIndex(2) === 1 });
 
 // 取數：有手動輸入兩個數就用手動（換算規則和取卦相同：數一 ÷10 定天干、數二 ÷12 定地支），否則電腦隨機
-function deal(kind: Spread["kind"], question: string, year: string, nums: [string, string] | null): Spread {
-  const stem = nums ? stemOf(nums[0]) : STEMS[randomIndex(10)];
-  const life = nums ? branchOf(nums[1]) : BRANCHES[randomIndex(12)];
+// gz：直接選的干支（2026/11/01），優先於數字
+function deal(kind: Spread["kind"], question: string, year: string, nums: [string, string] | null, gz: { stem: string; life: string } | null = null): Spread {
+  const stem = gz ? gz.stem : nums ? stemOf(nums[0]) : STEMS[randomIndex(10)];
+  const life = gz ? gz.life : nums ? branchOf(nums[1]) : BRANCHES[randomIndex(12)];
   const mains = shuffle(MAIN_DECK);
   const minors = shuffle(MINOR_DECK);
   const lifeIndex = BRANCHES.indexOf(life);
@@ -247,7 +250,7 @@ function deal(kind: Spread["kind"], question: string, year: string, nums: [strin
     question,
     year: kind === "年運" ? year : String(lunarYearOf(now)),
     at: now.toISOString(),
-    ...(nums ? { nums } : {}),
+    ...(gz ? { chosen: true } : nums ? { nums } : {}),
   };
 }
 
@@ -650,6 +653,10 @@ export function SpreadView({
   const [year, setYear] = useState(initial?.year || String(new Date().getFullYear()));
   const [manual, setManual] = useState(false);
   const [inputs, setInputs] = useState<[string, string]>(["", ""]);
+  // 取數第三種：直接選干支（2026/11/01）
+  const [chooseGZ, setChooseGZ] = useState(false);
+  const [gzStem, setGzStem] = useState("甲");
+  const [gzLife, setGzLife] = useState("子");
   const cleanNum = (v: string) => v.trim().replace(/^0+(?=\d)/, "");
   const validNums = inputs.every((v) => /^\d+$/.test(v.trim()));
   const validFirst = /^\d+$/.test(inputs[0].trim()); // 小牌型只用數一定天干
@@ -690,19 +697,20 @@ export function SpreadView({
   function draw() {
     if (layoutPick !== "twelve") {
       // 小牌型：只取數天干（數一 ÷10）；牌電腦抽或手動選
-      const useManual = manual && !skipNum;
-      const base = deal(kind, question.trim(), year.trim(), useManual ? [cleanNum(inputs[0]), cleanNum(inputs[1]) || "0"] : null);
+      const useGZ = chooseGZ && !skipNum;
+      const useManual = manual && !skipNum && !useGZ;
+      const base = deal(kind, question.trim(), year.trim(), useManual ? [cleanNum(inputs[0]), cleanNum(inputs[1]) || "0"] : null, useGZ ? { stem: gzStem, life: gzLife } : null);
       setSmall(
         newSmall(
           layoutPick,
-          { stem: skipNum ? "" : base.stem, life: base.life, kind: base.kind, question: base.question, year: base.year, at: base.at, ...(useManual ? { nums: [cleanNum(inputs[0]), ""] as [string, string] } : {}) },
+          { stem: skipNum ? "" : base.stem, life: base.life, kind: base.kind, question: base.question, year: base.year, at: base.at, ...(useManual ? { nums: [cleanNum(inputs[0]), ""] as [string, string] } : {}), ...(useGZ ? { chosen: true } : {}) },
           handPick,
         ),
       );
       setMessage("");
       return;
     }
-    const next = deal(kind, question.trim(), year.trim(), manual ? [cleanNum(inputs[0]), cleanNum(inputs[1])] : null);
+    const next = deal(kind, question.trim(), year.trim(), manual && !chooseGZ ? [cleanNum(inputs[0]), cleanNum(inputs[1])] : null, chooseGZ ? { stem: gzStem, life: gzLife } : null);
     if (handPick) {
       // 手動選牌：取數照常（定天干、命宮、宮干），牌全部留空給本人選
       setDraft({ ...next, cells: next.cells.map((c) => ({ ...c, main: null, minor: null })), body: null, stage: null });
@@ -987,7 +995,7 @@ export function SpreadView({
           yearGZ={/^\d{4}$/.test(small.year) ? yearGanzhi(Number(small.year)) : ""}
           starsOf={starsOf}
           mutagens={MUTAGENS}
-          numText={!small.stem ? "不取數" : small.nums ? `手動輸入 ${small.nums[0]}（${small.nums[0]} ÷ 10 餘 ${BigInt(small.nums[0]) % 10n} → ${small.stem}）` : "電腦隨機"}
+          numText={!small.stem ? "不取數" : small.chosen ? `直接選干支：${small.stem}干` : small.nums ? `手動輸入 ${small.nums[0]}（${small.nums[0]} ÷ 10 餘 ${BigInt(small.nums[0]) % 10n} → ${small.stem}）` : "電腦隨機"}
           timeText={timeLabel(small.at)}
           onReset={() => setSmall(null)}
           onSaved={onSaved}
@@ -1064,18 +1072,52 @@ export function SpreadView({
               <button
                 key={String(m)}
                 type="button"
-                aria-pressed={!skipNum && manual === m}
+                aria-pressed={!skipNum && !chooseGZ && manual === m}
                 onClick={() => {
                   setNoNum(false);
+                  setChooseGZ(false);
                   setManual(m);
                 }}
-                className={chip(!skipNum && manual === m)}
+                className={chip(!skipNum && !chooseGZ && manual === m)}
               >
                 {m ? "手動輸入" : "電腦隨機"}
               </button>
             ))}
+            <button
+              type="button"
+              aria-pressed={!skipNum && chooseGZ}
+              onClick={() => {
+                setNoNum(false);
+                setChooseGZ(true);
+              }}
+              className={chip(!skipNum && chooseGZ)}
+            >
+              選干支
+            </button>
           </div>
-          {manual && !skipNum && (
+          {chooseGZ && !skipNum && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex items-center gap-1">
+                天干
+                <select aria-label="取數天干（直接選）" value={gzStem} onChange={(e) => setGzStem(e.target.value)} className={`${INPUT} w-auto py-1`}>
+                  {[...STEMS].map((x) => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </select>
+              </label>
+              {!isSmall && (
+                <label className="flex items-center gap-1">
+                  命宮
+                  <select aria-label="命宮地支（直接選）" value={gzLife} onChange={(e) => setGzLife(e.target.value)} className={`${INPUT} w-auto py-1`}>
+                    {[...BRANCHES].map((x) => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          )}
+          {manual && !chooseGZ && !skipNum && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {(isSmall ? [0] : [0, 1]).map((i) => (
                 <input
@@ -1100,7 +1142,7 @@ export function SpreadView({
               </button>
             ))}
           </div>
-          <button type="button" disabled={(kind === "年運" && !validYear) || (manual && !skipNum && !(isSmall ? validFirst : validNums))} onClick={draw} className={`${BUTTON_PRIMARY} mt-1 py-2.5`}>
+          <button type="button" disabled={(kind === "年運" && !validYear) || (manual && !chooseGZ && !skipNum && !(isSmall ? validFirst : validNums))} onClick={draw} className={`${BUTTON_PRIMARY} mt-1 py-2.5`}>
             {handPick ? "開始選牌" : "抽牌"}
           </button>
           <p className="text-center text-xs text-ink-soft">
