@@ -6,7 +6,7 @@ set -euo pipefail
 PHONE="${1:?請給 phone-pages 資料夾路徑}"
 SRC="$PHONE/zwchart/src"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/src/zw"
-FILES=(chart.tsx cards.ts cardImages.ts cardView.tsx spread.tsx smallSpread.tsx spreadPick.tsx draw.tsx gua.tsx cases.tsx stars.ts store.ts ui.tsx)
+FILES=(chart.tsx cards.ts cardImages.ts cardView.tsx photoRead.ts spread.tsx smallSpread.tsx spreadPick.tsx draw.tsx gua.tsx cases.tsx stars.ts store.ts ui.tsx)
 mkdir -p "$DEST/shims"
 for f in "${FILES[@]}"; do cp "$SRC/$f" "$DEST/$f"; done
 cp "$SRC/shims/link.tsx" "$DEST/shims/link.tsx"
