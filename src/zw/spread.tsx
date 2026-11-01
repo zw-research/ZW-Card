@@ -104,6 +104,12 @@ function restem<T extends Restemable>(sp: T, stem: string, life: string, from: s
     }),
   } as T;
 }
+// 改取數＋年份：天干、命宮有變才重排宮干並記原本的取數；年份只有年運能改
+function refix<T extends Restemable & { year: string; kind: string }>(sp: T, stem: string, life: string, year: string | undefined, from: string): T {
+  const moved = stem !== sp.stem || life !== sp.life;
+  const next = moved ? restem(sp, stem, life, from) : sp;
+  return sp.kind === "年運" && year && year !== sp.year ? { ...next, year } : next;
+}
 // 取數方式的文字（存案例、改取數時記原本的）
 function numText(sp: { stem: string; life: string; nums?: [string, string]; fixedFrom?: string }) {
   if (sp.fixedFrom) return `改取數：${sp.stem}干、命宮${sp.life}（原本 ${sp.fixedFrom}）`;
@@ -113,10 +119,13 @@ function numText(sp: { stem: string; life: string; nums?: [string, string]; fixe
 }
 const fromText = (sp: { stem: string; life: string; nums?: [string, string] }) => (sp.nums ? numText(sp) : `電腦隨機 ${sp.stem}干、命宮${sp.life}`);
 // 盤下的小按鈕「改取數」：展開兩個下拉（天干、命宮），改了才套用
-function FixNum({ stem, life, onApply }: { stem: string; life: string; onApply: (stem: string, life: string) => void }) {
+// year：年運的盤才傳，多一格年份（2026/11/01）
+function FixNum({ stem, life, year, onApply }: { stem: string; life: string; year?: string; onApply: (stem: string, life: string, year?: string) => void }) {
   const [open, setOpen] = useState(false);
   const [s, setS] = useState(stem);
   const [l, setL] = useState(life);
+  const [y, setY] = useState(year ?? "");
+  const yearOk = year === undefined || /^\d{4}$/.test(y.trim());
   if (!open)
     return (
       <button
@@ -124,11 +133,12 @@ function FixNum({ stem, life, onApply }: { stem: string; life: string; onApply: 
         onClick={() => {
           setS(stem);
           setL(life);
+          setY(year ?? "");
           setOpen(true);
         }}
         className={`w-fit text-sm text-ink-soft underline underline-offset-4 ${FOCUS}`}
       >
-        改取數
+        {year === undefined ? "改取數" : "改取數／年份"}
       </button>
     );
   const sel = `rounded-md border border-line-strong bg-paper-light px-1.5 py-1 text-sm ${FOCUS}`;
@@ -150,11 +160,27 @@ function FixNum({ stem, life, onApply }: { stem: string; life: string; onApply: 
           ))}
         </select>
       </label>
+      {year !== undefined && (
+        <label className="flex items-center gap-1">
+          年運
+          <input
+            aria-label="年運年份"
+            inputMode="numeric"
+            maxLength={4}
+            value={y}
+            onChange={(e) => setY(e.target.value.replace(/\D/g, ""))}
+            className={`${sel} w-16 tabular-nums`}
+          />
+          年
+        </label>
+      )}
       <button
         type="button"
+        disabled={!yearOk}
         onClick={() => {
           setOpen(false);
-          if (s !== stem || l !== life) onApply(s, l);
+          const ny = year === undefined ? undefined : y.trim();
+          if (s !== stem || l !== life || (ny !== undefined && ny !== year)) onApply(s, l, ny);
         }}
         className={`rounded-full bg-ink px-3 py-1 text-xs text-paper-light ${FOCUS}`}
       >
@@ -163,7 +189,7 @@ function FixNum({ stem, life, onApply }: { stem: string; life: string; onApply: 
       <button type="button" onClick={() => setOpen(false)} className={`text-xs underline underline-offset-4 ${FOCUS}`}>
         取消
       </button>
-      <span className="w-full text-xs text-ink-soft">牌留在原本的宮位，只重排宮位地支和宮干</span>
+      <span className="w-full text-xs text-ink-soft">牌留在原本的宮位，只重排宮位地支和宮干{year !== undefined ? "；年份只影響年干四化、祿羊陀" : ""}</span>
     </span>
   );
 }
@@ -394,7 +420,7 @@ function taipeiStamp() {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
     .formatToParts(new Date())
     .reduce<Record<string, string>>((all, part) => ({ ...all, [part.type]: part.value }), {});
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
+  return `${Number(parts.month)}/${Number(parts.day)} ${parts.hour}:${parts.minute}`;
 }
 
 function readLast(): Spread | null {
@@ -720,19 +746,19 @@ export function SpreadView({
     setSelected(null);
   }
   // 改取數：牌不動，只換天干、命宮（四化、煞忌跟著重算）
-  function fixSpread(stem: string, life: string) {
+  function fixSpread(stem: string, life: string, year?: string) {
     if (!spread || savedId !== null) return;
-    const next = restem(spread, stem, life, fromText(spread));
+    const next = refix(spread, stem, life, year, fromText(spread));
     setSpread(next);
     writeLast(next);
     setSelected(null);
   }
-  function fixDraft(stem: string, life: string) {
+  function fixDraft(stem: string, life: string, year?: string) {
     if (!draft) return;
-    setDraft(restem(draft, stem, life, fromText(draft)));
+    setDraft(refix(draft, stem, life, year, fromText(draft)));
   }
   // 存過的盤改取數（2026/10/31）：牌不動，改寫 Notion 的牌組欄和內文「牌陣」收合標題，內頁記一行；可復原
-  const [pendingFix, setPendingFix] = useState<{ stem: string; life: string } | null>(null);
+  const [pendingFix, setPendingFix] = useState<{ stem: string; life: string; year?: string } | null>(null);
   const [caseUndo, setCaseUndo] = useState<{ prev: Spread; prevCards: string; prevBlock: string; nextCards: string; log: string } | null>(null);
   async function readCase(id: string) {
     const payload = (await mcp!.callTool(SERVER, "notion-fetch", { id }, { cache: false })).payload;
@@ -749,7 +775,7 @@ export function SpreadView({
   }
   async function applyCaseFix() {
     if (!mcp || !caseId || !spread || !pendingFix || busy) return;
-    const { stem, life } = pendingFix;
+    const { stem, life, year } = pendingFix;
     setBusy(true);
     setMessage("");
     const id = caseId;
@@ -761,12 +787,18 @@ export function SpreadView({
       if (now.cards.trim() !== shown) throw { local: true, message: "這筆案例的牌組剛在別處改過，已停下沒有寫；請回案例重新打開牌陣再改。" };
       if (!now.block) throw { local: true, message: "內文找不到「牌陣」收合標題，沒有寫；請在 Notion 檢查這筆的內文。" };
       const keep = keepFrom(now.block);
-      const next = restem(spread, stem, life, "");
-      const { fixedFrom: _f, ...clean } = next;
+      const moved = stem !== spread.stem || life !== spread.life;
+      const { fixedFrom: _f, ...clean } = refix(spread, stem, life, year, "");
       const nextSpread = clean as Spread;
+      const yearMoved = nextSpread.year !== spread.year;
+      if (!moved && !yearMoved) throw { local: true, message: "沒有改到東西。" };
       const nextCards = spreadText(nextSpread);
-      const nextBlock = spreadToggle(nextSpread, { ...keep, num: fixedNumText(nextSpread, keep.num) });
-      const log = `${taipeiStamp()}｜手機頁：改取數（${spread.stem}干、命宮${spread.life}→${stem}干、命宮${life}，牌不動，牌組欄與「牌陣」內文已重算）`;
+      const nextBlock = spreadToggle(nextSpread, { ...keep, num: moved ? fixedNumText(nextSpread, keep.num) : keep.num });
+      const what = [
+        ...(moved ? [`取數 ${spread.stem}干、命宮${spread.life}→${stem}干、命宮${life}`] : []),
+        ...(yearMoved ? [`年運 ${spread.year}→${nextSpread.year}`] : []),
+      ].join("；");
+      const log = `${taipeiStamp()}｜手機頁：${moved ? "改取數" : "改年份"}（${what}，牌不動，牌組欄與「牌陣」內文已重算）`;
       step = "改寫內文";
       await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_content", content_updates: [{ old_str: now.block, new_str: nextBlock }], allow_async: false });
       step = "改牌組欄";
@@ -782,13 +814,13 @@ export function SpreadView({
       await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "insert_content", content: log, position: { type: "end" }, allow_async: false });
       step = "回讀核對";
       const check = await readCase(id);
-      if (check.cards.trim() !== nextCards || !check.block?.includes(`取數天干：${stem}　命宮在${life}`)) throw { local: true, message: "寫完回讀對不上，請到 Notion 看這筆案例。" };
+      if (check.cards.trim() !== nextCards || !check.block?.includes(`取數天干：${stem}　命宮在${life}`) || (yearMoved && !check.block.includes(`年運（${nextSpread.year}）`))) throw { local: true, message: "寫完回讀對不上，請到 Notion 看這筆案例。" };
       setCaseUndo({ prev: spread, prevCards: shown, prevBlock: unbold(now.block), nextCards, log });
       setSpread(nextSpread);
       onCaseFixed?.(nextSpread);
       setSelected(null);
       setPendingFix(null);
-      setMessage(`已改成 ${stem}干、命宮${life}，牌組欄和內文都已更新。`);
+      setMessage(`已改成 ${stem}干、命宮${life}${nextSpread.kind === "年運" ? `、年運 ${nextSpread.year}` : ""}，牌組欄和內文都已更新。`);
     } catch (e) {
       setPendingFix(null);
       setMessage(`未儲存（${step}）：${why(e)}`);
@@ -919,7 +951,7 @@ export function SpreadView({
       {!spread && draft && (
         <section className="flex flex-col gap-2">
           <SpreadPicker draft={draft} onChange={setDraft} onDone={finishPick} title={draft.question || (draft.kind === "年運" ? `${draft.year} 年運` : "牌陣")} />
-          <FixNum key={`${draft.at}${draft.stem}${draft.life}`} stem={draft.stem} life={draft.life} onApply={fixDraft} />
+          <FixNum key={`${draft.at}${draft.stem}${draft.life}${draft.year}`} stem={draft.stem} life={draft.life} year={draft.kind === "年運" ? draft.year : undefined} onApply={fixDraft} />
           {confirmDrop ? (
             <span role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-apricot-soft px-3 py-2 text-sm text-apricot-deep">
               放棄這盤手選的牌，回到抽牌前？
@@ -1299,13 +1331,20 @@ export function SpreadView({
                 到案例看 →
               </button>
             )}
-            {!fromCase && savedId === null && <FixNum key={`${spread.at}${spread.stem}${spread.life}`} stem={spread.stem} life={spread.life} onApply={fixSpread} />}
+            {!fromCase && savedId === null && <FixNum key={`${spread.at}${spread.stem}${spread.life}${spread.year}`} stem={spread.stem} life={spread.life} year={spread.kind === "年運" ? spread.year : undefined} onApply={fixSpread} />}
             {fromCase && caseId && mcp && !pendingFix && !busy && (
-              <FixNum key={`case${spread.stem}${spread.life}`} stem={spread.stem} life={spread.life} onApply={(stem, life) => setPendingFix({ stem, life })} />
+              <FixNum
+                key={`case${spread.stem}${spread.life}${spread.year}`}
+                stem={spread.stem}
+                life={spread.life}
+                year={spread.kind === "年運" ? spread.year : undefined}
+                onApply={(stem, life, year) => setPendingFix({ stem, life, year })}
+              />
             )}
             {fromCase && pendingFix && (
               <span role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-apricot-soft px-3 py-2 text-sm text-apricot-deep">
-                這盤已存成案例。改成 {pendingFix.stem}干、命宮{pendingFix.life}，會改寫 Notion 的牌組欄和內文「牌陣」，牌不動。確定嗎？
+                這盤已存成案例。改成 {pendingFix.stem}干、命宮{pendingFix.life}
+                {spread.kind === "年運" && pendingFix.year ? `、年運 ${pendingFix.year}` : ""}，會改寫 Notion 的牌組欄和內文「牌陣」，牌不動。確定嗎？
                 <button type="button" disabled={busy} onClick={applyCaseFix} className={`rounded-full bg-ink px-3 py-1 text-xs text-paper-light ${FOCUS}`}>
                   {busy ? "寫入中…" : "確定寫入"}
                 </button>
