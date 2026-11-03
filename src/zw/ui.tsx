@@ -412,7 +412,13 @@ export function SaveImage({ make, filename, className = "" }: { make: () => Prom
     if (state === "busy") return;
     setState("busy");
     try {
-      const blob = await make();
+      // 圖片本身做不出來（Safari 畫布、記憶體）就說做不出來，不要叫她去開權限（2026/11/3 修）
+      let blob: Blob | null = null;
+      try {
+        blob = await make();
+      } catch {
+        blob = null;
+      }
       if (!blob) throw { code: "make" };
       await saveBlob(blob, filename);
       setState("done");

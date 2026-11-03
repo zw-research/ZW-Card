@@ -50,6 +50,8 @@ const fullPalace = (raw: string) => {
 
 // 「卦」欄位文字。新格式：丁亥｜B｜對方｜主:官祿｜輔:夫妻、福德｜手動 17,36
 // 舊格式：甲子｜官祿（當作 A 模式）
+let saveLock = false; // 存案例進行中（整頁只有一個）
+
 export function guaText(g: Omit<GuaInit, "personId" | "question" | "at">) {
   const parts = [`${g.stem}${g.branch}`, g.mode, g.subject, `主:${g.main}`];
   if (g.aux.length) parts.push(`輔:${g.aux.join("、")}`);
@@ -176,7 +178,17 @@ export function GuaView({
     setSetup((s) => ({ ...s, aux: s.aux.includes(name) ? s.aux.filter((x) => x !== name) : [...s.aux, name] }));
   }
 
+  // 連點兩下不會存成兩筆：按鈕 disabled 要等畫面更新，這裡先擋（2026/11/3 修）
   async function save() {
+    if (saveLock) return;
+    saveLock = true;
+    try {
+      await saveOnce();
+    } finally {
+      saveLock = false;
+    }
+  }
+  async function saveOnce() {
     if (!mcp || !gua || !drawn || !person) return;
     setBusy(true);
     setMessage("");

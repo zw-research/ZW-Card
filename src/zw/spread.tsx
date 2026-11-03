@@ -54,6 +54,8 @@ const SANFANG_BG: Record<string, string> = { 命宮: "bg-apricot/45", 財帛: "b
 const SHA = ["擎羊", "陀羅", "火星", "鈴星", "化忌"];
 
 // 實際年干支：年份換干支；問事用抽牌當天的農曆年（過春節才換年）
+let saveLock = false; // 存案例進行中（整頁只有一個）
+
 export function yearGanzhi(year: number) {
   return `${STEMS[(((year - 4) % 10) + 10) % 10]}${BRANCHES[(((year - 4) % 12) + 12) % 12]}`;
 }
@@ -769,19 +771,33 @@ export function SpreadView({
   }
   // 存過的盤改取數（2026/10/31）：牌不動，改寫 Notion 的牌組欄和內文「牌陣」收合標題，內頁記一行；可復原
   const [pendingFix, setPendingFix] = useState<{ stem: string; life: string; year?: string } | null>(null);
-  const [caseUndo, setCaseUndo] = useState<{ prev: Spread; prevCards: string; prevBlock: string; nextCards: string; log: string } | null>(null);
+  const [caseUndo, setCaseUndo] = useState<{
+    prev: Spread;
+    prevCards: string;
+    prevBlock: string;
+    nextCards: string;
+    log: string;
+    title?: { prev: string; next: string };
+    ask?: { prev: string; next: string };
+  } | null>(null);
   async function readCase(id: string) {
     const payload = (await mcp!.callTool(SERVER, "notion-fetch", { id }, { cache: false })).payload;
     const text = typeof payload === "string" ? payload : String((payload as { text?: string } | undefined)?.text ?? "");
     const props = text.match(/<properties>\s*([\s\S]*?)\s*<\/properties>/);
     let cards = "";
+    let title = "";
     try {
-      cards = String((props ? JSON.parse(props[1]) : {})["牌組"] ?? "");
+      const p = props ? JSON.parse(props[1]) : {};
+      cards = String(p["牌組"] ?? "");
+      title = String(p["案例名稱"] ?? "");
     } catch {
       cards = "";
     }
-    const block = findSpreadToggle(pageContent(payload));
-    return { cards, block };
+    const content = pageContent(payload);
+    const block = findSpreadToggle(content);
+    // 「## 提問」下面那一行（改年份時一起換年份）
+    const ask = content.match(/## 提問\n+([^\n]+)/);
+    return { cards, block, title, ask: ask ? { whole: ask[0], line: ask[1] } : null };
   }
   async function applyCaseFix() {
     if (!mcp || !caseId || !spread || !pendingFix || busy) return;
@@ -794,7 +810,9 @@ export function SpreadView({
     try {
       step = "讀取案例";
       const now = await readCase(id);
-      if (now.cards.trim() !== shown) throw { local: true, message: "這筆案例的牌組剛在別處改過，已停下沒有寫；請回案例重新打開牌陣再改。" };
+      // 第一版的牌組欄（「丁干」、問事不帶年份、空宮倒）先整理成現在的寫法再比，內容一樣就不算別處改過（2026/11/1 修）
+      const nowParsed = parseSpreadText(now.cards, { at: spread.at || undefined });
+      if ((nowParsed ? spreadText(nowParsed) : now.cards.trim()) !== shown) throw { local: true, message: "這筆案例的牌組剛在別處改過，已停下沒有寫；請回案例重新打開牌陣再改。" };
       if (!now.block) throw { local: true, message: "內文找不到「牌陣」收合標題，沒有寫；請在 Notion 檢查這筆的內文。" };
       const keep = keepFrom(now.block);
       const moved = stem !== spread.stem || life !== spread.life;
@@ -803,34 +821,56 @@ export function SpreadView({
       const yearMoved = nextSpread.year !== spread.year;
       if (!moved && !yearMoved) throw { local: true, message: "沒有改到東西。" };
       const nextCards = spreadText(nextSpread);
-      const nextBlock = spreadToggle(nextSpread, { ...keep, num: moved ? fixedNumText(nextSpread, keep.num) : keep.num });
+      // 改年份：案例名稱和「## 提問」那行有舊年份就換成新年份（2026/11/3 皐月確認）
+      const swapYear = (t: string) => (yearMoved && spread.year && t.includes(spread.year) ? t.split(spread.year).join(nextSpread.year) : t);
+      const nextTitle = swapYear(now.title);
+      const titleMoved = Boolean(now.title) && nextTitle !== now.title;
+      const nextAsk = now.ask && swapYear(now.ask.line) !== now.ask.line ? now.ask.whole.replace(now.ask.line, swapYear(now.ask.line)) : null;
+      if (titleMoved) nextSpread.question = nextTitle;
+      const nextBlock = spreadToggle(nextSpread, { ...keep, num: moved ? fixedNumText(nextSpread, keep.num === "電腦隨機" ? `電腦隨機 ${spread.stem}干、命宮${spread.life}` : keep.num) : keep.num });
       const what = [
         ...(moved ? [`取數 ${spread.stem}干、命宮${spread.life}→${stem}干、命宮${life}`] : []),
         ...(yearMoved ? [`年運 ${spread.year}→${nextSpread.year}`] : []),
       ].join("；");
-      const log = `${taipeiStamp()}｜手機頁：${moved ? "改取數" : "改年份"}（${what}，牌不動，牌組欄與「牌陣」內文已重算）`;
+      const renamed = titleMoved ? `；案例名稱「${now.title}」→「${nextTitle}」` : "";
+      const log = `${taipeiStamp()}｜手機頁：${moved ? "改取數" : "改年份"}（${what}，牌不動，牌組欄與「牌陣」內文已重算${renamed}）`;
       step = "改寫內文";
       await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_content", content_updates: [{ old_str: now.block, new_str: nextBlock }], allow_async: false });
       step = "改牌組欄";
       try {
-        await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_properties", properties: { 牌組: nextCards }, allow_async: false });
+        await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_properties", properties: titleMoved ? { 牌組: nextCards, 案例名稱: nextTitle } : { 牌組: nextCards }, allow_async: false });
       } catch (e) {
         // 牌組欄沒寫成：把內文改回去，兩邊保持一致
         const back = await readCase(id).catch(() => null);
         if (back?.block) await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "update_content", content_updates: [{ old_str: back.block, new_str: unbold(now.block) }], allow_async: false }).catch(() => null);
         throw e;
       }
+      let askDone = false;
+      if (nextAsk && now.ask) {
+        askDone = await mcp
+          .callTool(SERVER, "notion-update-page", { page_id: id, command: "update_content", content_updates: [{ old_str: now.ask.whole, new_str: nextAsk }], allow_async: false })
+          .then(() => true)
+          .catch(() => false);
+      }
       step = "記紀錄";
       await mcp.callTool(SERVER, "notion-update-page", { page_id: id, command: "insert_content", content: log, position: { type: "end" }, allow_async: false });
       step = "回讀核對";
       const check = await readCase(id);
       if (check.cards.trim() !== nextCards || !check.block?.includes(`取數天干：${stem}　命宮在${life}`) || (yearMoved && !check.block.includes(`年運（${nextSpread.year}）`))) throw { local: true, message: "寫完回讀對不上，請到 Notion 看這筆案例。" };
-      setCaseUndo({ prev: spread, prevCards: shown, prevBlock: unbold(now.block), nextCards, log });
+      setCaseUndo({
+        prev: spread,
+        prevCards: now.cards.trim(),
+        prevBlock: unbold(now.block),
+        nextCards,
+        log,
+        title: titleMoved ? { prev: now.title, next: nextTitle } : undefined,
+        ask: askDone && now.ask && nextAsk ? { prev: now.ask.whole, next: nextAsk } : undefined,
+      });
       setSpread(nextSpread);
       onCaseFixed?.(nextSpread);
       setSelected(null);
       setPendingFix(null);
-      setMessage(`已改成 ${stem}干、命宮${life}${nextSpread.kind === "年運" ? `、年運 ${nextSpread.year}` : ""}，牌組欄和內文都已更新。`);
+      setMessage(`已改成 ${stem}干、命宮${life}${nextSpread.kind === "年運" ? `、年運 ${nextSpread.year}` : ""}，牌組欄和內文都已更新${titleMoved ? `，案例名稱改成「${nextTitle}」` : ""}。${nextAsk && !askDone ? "（「提問」那行的年份沒改到，請到 Notion 手動改。）" : ""}`);
     } catch (e) {
       setPendingFix(null);
       setMessage(`未儲存（${step}）：${why(e)}`);
@@ -846,7 +886,8 @@ export function SpreadView({
       const now = await readCase(caseId);
       if (now.cards.trim() !== u.nextCards || !now.block) throw { local: true, message: "這筆案例在別處又改過，沒有復原；請到 Notion 看。" };
       await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_content", content_updates: [{ old_str: now.block, new_str: u.prevBlock }], allow_async: false });
-      await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_properties", properties: { 牌組: u.prevCards }, allow_async: false });
+      await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_properties", properties: u.title ? { 牌組: u.prevCards, 案例名稱: u.title.prev } : { 牌組: u.prevCards }, allow_async: false });
+      if (u.ask) await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_content", content_updates: [{ old_str: u.ask.next, new_str: u.ask.prev }], allow_async: false }).catch(() => null);
       await mcp.callTool(SERVER, "notion-update-page", { page_id: caseId, command: "update_content", content_updates: [{ old_str: u.log, new_str: `${u.log}（誤按，已復原）` }], allow_async: false }).catch(() => null);
       setSpread(u.prev);
       onCaseFixed?.(u.prev);
@@ -901,7 +942,17 @@ export function SpreadView({
   const yearLabel = yearGZ ? `年干 ${yearGZ}（${spread!.kind === "年運" ? "" : "農曆 "}${spread!.year}）` : "";
   const hitText = (hits: Hit[]) => hits.map((h) => `${h.star}化${MUTAGEN_NAMES[h.index]}→${h.where.length ? h.where.join("、") : "不在盤上"}`).join("；");
 
+  // 連點兩下不會存成兩筆：按鈕 disabled 要等畫面更新，這裡先擋（2026/11/3 修）
   async function save() {
+    if (saveLock) return;
+    saveLock = true;
+    try {
+      await saveOnce();
+    } finally {
+      saveLock = false;
+    }
+  }
+  async function saveOnce() {
     if (!mcp || !spread) return;
     setBusy(true);
     setMessage("");
@@ -1401,7 +1452,11 @@ export function SpreadView({
             {fromCase && pendingFix && (
               <span role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-apricot-soft px-3 py-2 text-sm text-apricot-deep">
                 這盤已存成案例。改成 {pendingFix.stem}干、命宮{pendingFix.life}
-                {spread.kind === "年運" && pendingFix.year ? `、年運 ${pendingFix.year}` : ""}，會改寫 Notion 的牌組欄和內文「牌陣」，牌不動。確定嗎？
+                {spread.kind === "年運" && pendingFix.year ? `、年運 ${pendingFix.year}` : ""}，會改寫 Notion 的牌組欄和內文「牌陣」，牌不動
+                {spread.kind === "年運" && pendingFix.year && pendingFix.year !== spread.year && spread.question.includes(spread.year)
+                  ? `；案例名稱「${spread.question}」改成「${spread.question.split(spread.year).join(pendingFix.year)}」，「提問」那行有年份也一起換`
+                  : ""}
+                。確定嗎？
                 <button type="button" disabled={busy} onClick={applyCaseFix} className={`rounded-full bg-ink px-3 py-1 text-xs text-paper-light ${FOCUS}`}>
                   {busy ? "寫入中…" : "確定寫入"}
                 </button>

@@ -77,6 +77,9 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
   const [doubt, setDoubt] = useState<Set<Key>>(new Set());
   const [confirmPhoto, setConfirmPhoto] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 讀牌要約 1 秒：讀完套在「那時最新」的草稿上，讀牌中按了改取數不會被蓋回去（2026/11/3 修）
+  const latest = useRef(draft);
+  latest.current = draft;
   const dropDoubt = (key: Key) => doubt.has(key) && setDoubt((s) => new Set([...s].filter((k) => k !== key)));
   async function readFile(file: File) {
     if (reading) return;
@@ -84,7 +87,7 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
     setReadMsg("");
     try {
       const r = await readPhoto(file, KINDS);
-      const { next, doubt: d } = applyRead(draft, r);
+      const { next, doubt: d } = applyRead(latest.current, r);
       onChange(next);
       setDoubt(d);
       setActive(null);
@@ -101,7 +104,7 @@ export function SpreadPicker({ draft, onChange, onDone, title }: { draft: Draft;
     setTabId(null);
   }
   function pick(name: string) {
-    if (!active) return;
+    if (!active || reading) return; // 讀牌中先不收手選，讀完會整盤填上
     dropDoubt(active);
     const cur = getCard(draft, active);
     const next = setCard(draft, active, fixOrient({ name, reversed: cur?.reversed ?? false }));

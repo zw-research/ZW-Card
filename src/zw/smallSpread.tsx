@@ -61,6 +61,8 @@ function fillRandom(set: CardSet): CardSet {
   }
   return { ...set, groups };
 }
+let saveLock = false; // 存案例進行中（整頁只有一個）
+
 export function newSmall(layout: LayoutId, base: Omit<Small, "layout" | "set" | "hand" | "saved">, hand: boolean): Small {
   const set: CardSet = { layout, groups: [emptyPicks(layout)] };
   return { ...base, layout, set: hand ? set : fillRandom(set), hand };
@@ -152,7 +154,17 @@ export function SmallSpread({
     setActive(null);
   }
 
+  // 連點兩下不會存成兩筆：按鈕 disabled 要等畫面更新，這裡先擋（2026/11/3 修）
   async function save() {
+    if (saveLock) return;
+    saveLock = true;
+    try {
+      await saveOnce();
+    } finally {
+      saveLock = false;
+    }
+  }
+  async function saveOnce() {
     if (!mcp || !done || value.saved) return;
     setBusy(true);
     setMessage("");

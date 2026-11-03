@@ -1297,6 +1297,8 @@ export function CasesView({
     if (!before || data.trackUntil !== before.trackUntil) props["date:可追蹤期限:start"] = data.trackUntil || null;
     // 一筆案例可能連了多個命盤，畫面只帶第一個；沒改命盤就不送，免得把其他關聯清掉
     if (before && data.personId === before.personId) delete props["命盤"];
+    // 存過的牌組一律鎖住：編輯時不送牌組欄，免得舊寫法（空宮倒、<br>、命：遷：）被重新整理後寫回 Notion（2026/11/1 修）
+    if (before && before.cards.trim()) delete props["牌組"];
     if (before && data.date === before.date) {
       delete props["date:日期:start"];
       delete props["date:日期:is_datetime"];
@@ -1366,9 +1368,18 @@ export function CasesView({
         properties: props,
         allow_async: false,
       });
+      // 原本沒有牌組、這次補選又是電腦隨機抽：和新增時一樣在內文記「電腦隨機抽牌」（2026/11/3 修）
+      let note = "";
+      if (!open.cards.trim() && data.cards && data.drawn) {
+        await mcp
+          .callTool(SERVER, "notion-update-page", { page_id: open.id, command: "insert_content", content: `## 牌組\n**${data.cards}**\n${DRAWN_MARK}`, position: { type: "end" }, allow_async: false })
+          .catch(() => {
+            note = "（內文沒記到「電腦隨機抽牌」，請到 Notion 補一行。）";
+          });
+      }
       await load();
       setMode("list");
-      flash("已更新。");
+      flash(`已更新。${note}`);
     } catch (e) {
       setError(explain(e as McpError));
     }
