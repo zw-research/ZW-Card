@@ -239,7 +239,9 @@ function deal(kind: Spread["kind"], question: string, year: string, nums: [strin
   const cells = GUA_PALACES.map((palace, k) => {
     // 宮位逆時針排：命宮往前一支是兄弟
     const branch = BRANCHES[(lifeIndex - k + 12) % 12];
-    return { palace, branch, stem: palaceStem(stem, branch), main: flip(mains[k]), minor: flip(minors[k]) };
+    // 發牌順序照皐月習慣（2026/11/6）：命宮→父母→福德…→兄弟，主牌發完第 13 張給身宮，再發輔星牌；整疊先洗過，機率不受順序影響
+    const turn = k === 0 ? 0 : 12 - k;
+    return { palace, branch, stem: palaceStem(stem, branch), main: flip(mains[turn]), minor: flip(minors[turn]) };
   });
   const now = new Date();
   return {

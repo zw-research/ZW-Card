@@ -20,12 +20,13 @@ const SHA = ["擎羊", "陀羅", "火星", "鈴星", "化忌"];
 
 type Key = string; // c0m／c0n …、body、stage
 type Kind = "main" | "minor" | "stage";
+// 選完自動跳下一格的順序＝皐月實體發牌的習慣（2026/11/6）：
+// 主牌 命宮→父母→福德→田宅→官祿→交友→遷移→疾厄→財帛→子女→夫妻→兄弟 → 身宮，再輔星牌同樣順序，最後長生（和宮位地支怎麼排無關）
+const DEAL = [0, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]; // cells 的索引（命宮、兄弟…父母）
 const ORDER: { key: Key; kind: Kind }[] = [
-  ...Array.from({ length: 12 }, (_, i) => [
-    { key: `c${i}m`, kind: "main" as Kind },
-    { key: `c${i}n`, kind: "minor" as Kind },
-  ]).flat(),
+  ...DEAL.map((i) => ({ key: `c${i}m`, kind: "main" as Kind })),
   { key: "body", kind: "main" },
+  ...DEAL.map((i) => ({ key: `c${i}n`, kind: "minor" as Kind })),
   { key: "stage", kind: "stage" },
 ];
 const KIND_CATS: Record<Kind, string[]> = { main: ["main", "pair"], minor: ["minor"], stage: ["stage"] };

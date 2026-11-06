@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { cardThumb } from "./cardImages";
+import { cardFull, cardThumb } from "./cardImages";
 import { CardZoom } from "./cardView";
 import { CARD_CATEGORY, CATEGORIES, SLOTS, fixOrient, hasOrient, isReversed, orientMark } from "./cards";
 import { randomIndex } from "./draw";
@@ -421,6 +421,8 @@ function CardChips({ text, linked = false }: { text: string; linked?: boolean })
 }
 
 // 案例內容頁：牌組直接顯示牌卡小圖（倒牌轉 180 度，圖下小字牌名，點牌看大圖）；有讀不懂的寫法就整組退回文字標籤
+const MQ_W = "w-[5.5rem]";
+const MQ_STAGE_W = "w-[7.5rem]"; // 長生牌再大一點（2026/11/5 皐月）
 function CardThumbs({ text }: { text: string }) {
   const [zoom, setZoom] = useState<Pick | null>(null);
   if (!text.trim()) return null;
@@ -432,26 +434,55 @@ function CardThumbs({ text }: { text: string }) {
       return { label, picks: body.split(/｜|＋/).map(parsePart) };
     });
   if (!groups.length || groups.some((group) => group.picks.some((pick) => !pick))) return <CardChips text={text} linked />;
+  // 命遷＋長生：左邊上命宮、下遷移，長生放右邊上下置中，中間細線（和牌陣小牌型同一種擺法；2026/11/5 皐月）
+  const mq = groups.length === 3 && /^命/.test(groups[0].label) && /^遷/.test(groups[1].label) && groups[2].label === "長生" && groups[2].picks.length === 1;
+  // 命遷＋長生的牌放大到 88px，左右撐滿手機寬度（2026/11/5 皐月：左右比例大一點）
+  // 一張牌：w 是寬度 class；放大的版面用原圖（440px），小圖只有 150px，放大會糊
+  const renderCard = (pick: Pick, key: number | string, w: string, full: boolean) => {
+    const thumb = full ? cardFull(pick.name) : cardThumb(pick.name);
+    return (
+      <button key={key} type="button" onClick={() => setZoom(pick)} aria-label={`${pickText(pick)}，看大圖`} className={`flex ${w} min-w-0 flex-col items-center gap-0.5 ${FOCUS}`}>
+        {thumb ? (
+          <img src={thumb} alt={pick.name} className={`aspect-[440/800] w-full rounded-[3px] object-cover ${isReversed(pick) ? "rotate-180" : ""}`} />
+        ) : (
+          <span className="flex aspect-[440/800] w-full items-center justify-center rounded-[3px] bg-paper text-[10px] text-ink-soft">{pick.name}</span>
+        )}
+        <span className="text-[10px] leading-tight whitespace-nowrap text-ink-soft">{pickText(pick)}</span>
+      </button>
+    );
+  };
+  // 命遷＋長生的牌放大到 88px，左右撐滿手機寬度（2026/11/5 皐月：左右比例大一點）
+  const renderGroup = (group: (typeof groups)[number], index: number, w = "w-14", spread = false) => (
+    <div key={index} className={`flex flex-wrap items-end gap-1.5 ${spread ? "justify-evenly" : ""}`}>
+      {group.label && <span className="w-full text-xs text-ink-soft">{group.label}</span>}
+      {group.picks.map((pick, i) => renderCard(pick!, i, w, w !== "w-14"))}
+    </div>
+  );
+  // 三張＋身宮：四張排成一排、撐滿寬度但每張最多 88px（手機上約 78px，四張 88px 一排放不下），身宮在最右邊、前面一條細線、上方寫「身宮」（2026/11/6 皐月）
+  const ts = groups.length === 2 && !groups[0].label && groups[0].picks.length === 3 && groups[1].label === "身宮" && groups[1].picks.length === 1;
   return (
     <div className="flex flex-col gap-2">
-      {groups.map((group, index) => (
-        <div key={index} className="flex flex-wrap items-end gap-1.5">
-          {group.label && <span className="w-full text-xs text-ink-soft">{group.label}</span>}
-          {group.picks.map((pick, i) => {
-            const thumb = cardThumb(pick!.name);
-            return (
-              <button key={i} type="button" onClick={() => setZoom(pick)} aria-label={`${pickText(pick!)}，看大圖`} className={`flex w-14 flex-col items-center gap-0.5 ${FOCUS}`}>
-                {thumb ? (
-                  <img src={thumb} alt={pick!.name} className={`aspect-[440/800] w-14 rounded-[3px] object-cover ${isReversed(pick!) ? "rotate-180" : ""}`} />
-                ) : (
-                  <span className="flex aspect-[440/800] w-14 items-center justify-center rounded-[3px] bg-paper text-[10px] text-ink-soft">{pick!.name}</span>
-                )}
-                <span className="text-[10px] leading-tight whitespace-nowrap text-ink-soft">{pickText(pick!)}</span>
-              </button>
-            );
-          })}
+      {mq ? (
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-2">{groups.slice(0, 2).map((group, index) => renderGroup(group, index, MQ_W))}</div>
+          <span className="w-px self-stretch bg-line-strong" />
+          {renderGroup(groups[2], 2, MQ_STAGE_W)}
         </div>
-      ))}
+      ) : ts ? (
+        <div className="grid grid-cols-[repeat(3,minmax(0,5.5rem))_auto_minmax(0,5.5rem)] items-end gap-x-1.5">
+          {groups[0].picks.map((pick, i) => renderCard(pick!, i, "w-full", true))}
+          <span className="mx-1 w-px self-stretch bg-line-strong" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-xs text-ink-soft">身宮</span>
+            {renderCard(groups[1].picks[0]!, "body", "w-full", true)}
+          </div>
+        </div>
+      ) : groups.every((group) => group.picks.length <= 3) ? (
+        // 三張（可多組）：和命遷＋長生一樣放大到 88px、用原圖，一組一排，三張平均分開撐滿寬度（2026/11/6 皐月）
+        groups.map((group, index) => renderGroup(group, index, MQ_W, group.picks.length === 3))
+      ) : (
+        groups.map((group, index) => renderGroup(group, index))
+      )}
       {zoom && <CardZoom card={{ name: zoom.name, reversed: isReversed(zoom) }} onClose={() => setZoom(null)} />}
     </div>
   );
