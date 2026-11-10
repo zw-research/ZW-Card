@@ -2,7 +2,7 @@
 
 import { astro, util } from "iztro";
 import Link from "./shims/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CARD_CATEGORY, cardHref } from "./cards";
 import { chartStore, useStore, useToday, type ChartProfile } from "./store";
 import {
@@ -802,7 +802,10 @@ function PalaceCell({
   onSelect,
   hideNatal,
   decadalLabel,
+  splitLu,
 }: {
+  // 祿存和各層的祿單獨一排放在煞上面（格子裡有空位時）；否則和煞排在同一排、放在煞前面
+  splitLu: boolean;
   // 隱藏生日＋近三層看到流月以下：不畫本命四化和本命祿存、擎羊、陀羅
   hideNatal: boolean;
   // 隱藏生日時大限歲數改寫第幾限（一限、二限…）；空字串就照常寫歲數
@@ -840,6 +843,36 @@ function PalaceCell({
   const FLOW_ROW =
     "flex flex-wrap items-start gap-x-0.5 gap-y-1 text-[11px] leading-[1.15] @2xl:text-xs @5xl:text-[15px] @5xl:leading-[1.15]";
   const FLOW_STAR = "whitespace-nowrap [writing-mode:vertical-rl]";
+  // 右下角最下排放煞（本命擎羊、陀羅、火星、鈴星和各層的羊、陀），祿（本命祿存和各層的祿）放在煞上面一排；
+  // 格子裡沒空位時（多一排會讓這一列格子變高）祿就和煞排在同一排、放在煞前面（2026/11/11 皐月）
+  const natalCorner = palace.minorStars.filter(
+    (star) => NATAL_STAR_COLORS[star.name] && !(hideNatal && NATAL_LU_YANG_TUO.has(star.name)),
+  );
+  const natalLabel = (star: (typeof natalCorner)[number]) => (
+    <StarLabel
+      key={star.name}
+      star={star}
+      layers={chipLayers} flying={flying} hideNatal={hideNatal}
+      className={`inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`}
+    />
+  );
+  const flowLabel = (star: (typeof flowStars)[number]) => (
+    <span
+      key={star.name}
+      className={`${FLOW_STAR} font-medium ${FLOW_STAR_COLORS[star.name[1]] ?? star.text}`}
+    >
+      {star.name}
+    </span>
+  );
+  const cornerFlow = flowStars.filter((star) => CORNER_FLOW_STARS.includes(star.name[1]));
+  const luStars = [
+    ...natalCorner.filter((star) => star.name === "祿存").map(natalLabel),
+    ...cornerFlow.filter((star) => star.name[1] === "祿").map(flowLabel),
+  ];
+  const shaStars = [
+    ...natalCorner.filter((star) => star.name !== "祿存").map(natalLabel),
+    ...cornerFlow.filter((star) => star.name[1] !== "祿").map(flowLabel),
+  ];
   // 這一宮在某層運限中的宮名小標；是該運限的命宮時填滿底色（小限是畫框）
   const layerChip = (layer: Layer, item: ActiveLayer["item"]) =>
     `rounded text-center whitespace-nowrap ${
@@ -868,6 +901,8 @@ function PalaceCell({
   return (
     <div
       style={{ gridRow: row, gridColumn: column }}
+      data-palace={palace.index}
+      data-lu={luStars.length > 0 ? "1" : undefined}
       onClick={onSelect}
       className={`flex min-h-28 min-w-0 cursor-pointer flex-col overflow-hidden transition-colors @2xl:min-h-36 @5xl:min-h-0 ${
         state === "selected"
@@ -878,9 +913,9 @@ function PalaceCell({
       }`}
     >
       {/* 星曜區。電腦版把右下那兩排疊在這一區的右下角，不另外佔高度，整張盤才不會太高 */}
-      <div className="relative flex flex-1 flex-col @5xl:min-h-36">
+      <div data-zone className="relative flex flex-1 flex-col @5xl:min-h-36">
       {/* 星曜直書並排：主星、輔星、雜曜、流曜 */}
-      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-2.5">
+      <div data-stars className="flex flex-wrap items-start gap-x-1.5 gap-y-1.5 p-1.5 @2xl:p-2 @5xl:gap-x-3 @5xl:gap-y-2 @5xl:p-2.5">
         <div className="flex flex-wrap items-start gap-x-0.5 gap-y-1 text-sm leading-[1.15] font-medium text-taupe-deep @2xl:text-base @5xl:gap-x-1.5 @5xl:text-xl @5xl:leading-[1.15]">
           {palace.majorStars.map((star) => (
             <StarLabel key={star.name} star={star} layers={chipLayers} flying={flying} hideNatal={hideNatal} />
@@ -923,10 +958,10 @@ function PalaceCell({
         </div>
       </div>
 
-      {/* 右下角固定兩排：上排是陰煞、蜚廉、指背和鸞喜（本命、大限、流年），
-          下排是本命的擎羊、陀羅、祿存、火星、鈴星，和各層的祿、羊、陀。
-          下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
-      <div className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-2.5 @5xl:pb-1.5">
+      {/* 右下角由上往下：陰煞、蜚廉、指背和鸞喜（本命、大限、流年）；祿（本命祿存和各層的祿，格子有空位才單獨一排）；
+          最下排是煞（本命擎羊、陀羅、火星、鈴星和各層的羊、陀），沒空位時祿排在這一排的最前面。
+          最下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
+      <div data-corner className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-2.5 @5xl:pb-1.5">
         <div className={`justify-end ${FLOW_ROW}`}>
           {/* 陰煞、蜚廉是雜曜；指背是將前十二神落在這一宮的那一顆 */}
           {palace.adjectiveStars
@@ -970,27 +1005,10 @@ function PalaceCell({
               </span>
             ))}
         </div>
-        <div className={`min-h-[2.3em] justify-end ${FLOW_ROW}`}>
-          {palace.minorStars
-            .filter((star) => NATAL_STAR_COLORS[star.name] && !(hideNatal && NATAL_LU_YANG_TUO.has(star.name)))
-            .map((star) => (
-              <StarLabel
-                key={star.name}
-                star={star}
-                layers={chipLayers} flying={flying} hideNatal={hideNatal}
-                className={`inline-flex font-medium ${NATAL_STAR_COLORS[star.name]}`}
-              />
-            ))}
-          {flowStars
-            .filter((star) => CORNER_FLOW_STARS.includes(star.name[1]))
-            .map((star) => (
-              <span
-                key={star.name}
-                className={`${FLOW_STAR} font-medium ${FLOW_STAR_COLORS[star.name[1]] ?? star.text}`}
-              >
-                {star.name}
-              </span>
-            ))}
+        {splitLu && luStars.length > 0 && <div className={`justify-end ${FLOW_ROW}`}>{luStars}</div>}
+        <div data-sha className={`min-h-[2.3em] justify-end ${FLOW_ROW}`}>
+          {!splitLu && luStars}
+          {shaStars}
         </div>
       </div>
       </div>
@@ -1211,6 +1229,18 @@ export function ChartView({
   }
   const gridRef = useRef<HTMLDivElement>(null);
   const fit = useFitToScreen(gridRef);
+  // 祿單獨一排的宮位：先全部和煞排在同一排畫一次，記下每格星曜區的高度；再全部拆開畫一次，
+  // 拆開後需要的高度沒超過原本高度的才拆（不會讓那一列格子變高）。
+  // 盤面內容或寬度變了就重量一次；量和重畫都在畫面顯示前完成，不輪詢
+  const [luSplit, setLuSplit] = useState<"merged" | "trial" | Set<number>>("merged");
+  const zoneHeights = useRef(new Map<number, number>());
+  const [layoutTick, setLayoutTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setLayoutTick((n) => n + 1);
+    window.addEventListener("resize", bump);
+    document.fonts?.ready.then(bump).catch(() => {});
+    return () => window.removeEventListener("resize", bump);
+  }, []);
   // 盤面外框：自動捲到這裡、全螢幕也是放大這一塊
   const boardRef = useRef<HTMLDivElement>(null);
   const [canFullscreen, setCanFullscreen] = useState(false);
@@ -1299,6 +1329,30 @@ export function ChartView({
         ? horoscope[LAYERS[depth - 1].key].index
         : null;
   const focus = selected ?? autoFocus;
+
+  useLayoutEffect(() => {
+    setLuSplit("merged");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chart, date, timeIndex, depth, nearOnly, showAdjective, hideNatal, hideBirth, focus, gua, showAge, layoutTick]);
+  useLayoutEffect(() => {
+    if (luSplit instanceof Set) return;
+    const cells = [...(gridRef.current?.querySelectorAll<HTMLElement>("[data-palace][data-lu]") ?? [])];
+    const part = (cell: HTMLElement, name: string) => cell.querySelector<HTMLElement>(`[data-${name}]`);
+    if (luSplit === "merged") {
+      zoneHeights.current.clear();
+      for (const cell of cells) zoneHeights.current.set(Number(cell.dataset.palace), part(cell, "zone")?.clientHeight ?? 0);
+      setLuSplit(cells.length ? "trial" : new Set());
+      return;
+    }
+    // 拆開後：星曜加右下角需要的高度，不超過合併時的星曜區高度就保留拆開
+    const next = new Set<number>();
+    for (const cell of cells) {
+      const index = Number(cell.dataset.palace);
+      const need = (part(cell, "stars")?.offsetHeight ?? 0) + (part(cell, "corner")?.offsetHeight ?? 0);
+      if (need <= (zoneHeights.current.get(index) ?? 0)) next.add(index);
+    }
+    setLuSplit(next);
+  });
   const related =
     focus === null ? [] : [(focus + 6) % 12, (focus + 4) % 12, (focus + 8) % 12];
 
@@ -1578,6 +1632,7 @@ export function ChartView({
             jiekong={palace.earthlyBranch === jiekongBranch(chart)}
             hideNatal={hideNatal}
             decadalLabel={hideBirth ? `${DECADAL_ORDINALS[decadalOrder.indexOf(palace.decadal.range[0])]}限` : ""}
+            splitLu={luSplit === "trial" || (luSplit instanceof Set && luSplit.has(palace.index))}
             state={
               focus === palace.index
                 ? "selected"
