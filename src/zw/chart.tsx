@@ -309,7 +309,7 @@ export function dailyBoardText(chart: Astrolabe, date: string) {
   return toggleBlock(2, DAILY_BOARD_HEADING, lines.join("\n"));
 }
 
-// 盤面一次最多疊幾層運限，取最靠近所選層次的幾層
+// 「近三層」開著時，盤面只疊最靠近所選層次的這幾層；關著時所選層以外的各層全疊
 const VISIBLE_LAYERS = 3;
 
 const MUTAGEN_NAMES = ["祿", "權", "科", "忌"];
@@ -1245,8 +1245,9 @@ export function ChartView({
   const date = pickedDate ?? today;
   const timeIndex = pickedTime ?? currentTimeIndex;
   const horoscope = date ? getHoroscope(chart, date, timeIndex) : null;
+  // 盤上疊的流曜（祿羊陀、鸞喜等）：照「近三層」開關，和下方各層列表一致
   const layers: ActiveLayer[] = horoscope
-    ? LAYERS.slice(Math.max(0, depth - VISIBLE_LAYERS), depth).map((layer) => ({
+    ? LAYERS.slice(nearOnly ? Math.max(0, depth - VISIBLE_LAYERS) : 0, depth).map((layer) => ({
         layer,
         item: horoscope[layer.key],
       }))
@@ -1283,7 +1284,7 @@ export function ChartView({
     ...guaLayer,
   ];
 
-  // 大限和流年的鸞喜一直顯示：盤上只疊最近的三層，這兩層沒被疊上去時，鸞喜另外補上
+  // 大限和流年的鸞喜一直顯示：「近三層」開著、這兩層沒被疊上去時，鸞喜另外補上
   const pinned: ActiveLayer[] = horoscope
     ? LAYERS.slice(0, Math.min(depth, 2))
         .filter((pin) => !layers.some(({ layer }) => layer.key === pin.key))

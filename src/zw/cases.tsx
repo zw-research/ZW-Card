@@ -453,7 +453,7 @@ function CardThumbs({ text }: { text: string }) {
   };
   // 命遷＋長生的牌放大到 88px，左右撐滿手機寬度（2026/11/5 皐月：左右比例大一點）
   const renderGroup = (group: (typeof groups)[number], index: number, w = "w-14", spread = false) => (
-    <div key={index} className={`flex flex-wrap items-end gap-1.5 ${spread ? "justify-evenly" : ""}`}>
+    <div key={index} className={`flex flex-wrap items-end gap-1.5 ${spread ? "max-w-[22rem] justify-evenly" : ""}`}>
       {group.label && <span className="w-full text-xs text-ink-soft">{group.label}</span>}
       {group.picks.map((pick, i) => renderCard(pick!, i, w, w !== "w-14"))}
     </div>
@@ -469,7 +469,7 @@ function CardThumbs({ text }: { text: string }) {
           {renderGroup(groups[2], 2, MQ_STAGE_W)}
         </div>
       ) : ts ? (
-        <div className="grid grid-cols-[repeat(3,minmax(0,5.5rem))_auto_minmax(0,5.5rem)] items-end gap-x-1.5">
+        <div className="grid w-fit max-w-full grid-cols-[repeat(3,minmax(0,5.5rem))_auto_minmax(0,5.5rem)] items-end gap-x-1.5">
           {groups[0].picks.map((pick, i) => renderCard(pick!, i, "w-full", true))}
           <span className="mx-1 w-px self-stretch bg-line-strong" />
           <div className="flex min-w-0 flex-col gap-0.5">
@@ -478,7 +478,7 @@ function CardThumbs({ text }: { text: string }) {
           </div>
         </div>
       ) : groups.every((group) => group.picks.length <= 3) ? (
-        // 三張（可多組）：和命遷＋長生一樣放大到 88px、用原圖，一組一排，三張平均分開撐滿寬度（2026/11/6 皐月）
+        // 三張（可多組）：和命遷＋長生一樣放大到 88px、用原圖，一組一排（寬畫面最多 22rem、靠左，和手機一樣的比例；2026/11/8），三張平均分開撐滿寬度（2026/11/6 皐月）
         groups.map((group, index) => renderGroup(group, index, MQ_W, group.picks.length === 3))
       ) : (
         groups.map((group, index) => renderGroup(group, index))
