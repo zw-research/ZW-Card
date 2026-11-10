@@ -959,8 +959,7 @@ function PalaceCell({
       </div>
 
       {/* 右下角由上往下：陰煞、蜚廉、指背和鸞喜（本命、大限、流年）；祿（本命祿存和各層的祿，格子有空位才單獨一排）；
-          最下排是煞（本命擎羊、陀羅、火星、鈴星和各層的羊、陀），沒空位時祿排在這一排的最前面。
-          最下排沒有星也保留高度，鸞喜的位置才不會跑掉 */}
+          最下排是煞（本命擎羊、陀羅、火星、鈴星和各層的羊、陀），沒空位時祿排在這一排的最前面。 */}
       <div data-corner className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-2.5 @5xl:pb-1.5">
         <div className={`justify-end ${FLOW_ROW}`}>
           {/* 陰煞、蜚廉是雜曜；指背是將前十二神落在這一宮的那一顆 */}
@@ -1006,9 +1005,13 @@ function PalaceCell({
             ))}
         </div>
         {splitLu && luStars.length > 0 && <div className={`justify-end ${FLOW_ROW}`}>{luStars}</div>}
-        <div data-sha className={`min-h-[2.3em] justify-end ${FLOW_ROW}`}>
-          {!splitLu && luStars}
-          {shaStars}
+        {/* 最下排從右往左、由下往上排：煞先排在最下面那一行，祿和煞併排時排在煞左邊，放不下才往上一行，煞一定在最下面（2026/11/11 皐月）。
+            高度 2em＝兩個字的直書星名，空的時候也保留，鸞喜的位置才不會跑掉 */}
+        <div
+          data-sha
+          className={`min-h-[2em] justify-start ${FLOW_ROW.replace("flex flex-wrap", "flex flex-row-reverse flex-wrap-reverse")}`}
+        >
+          {[...(splitLu ? [] : luStars), ...shaStars].reverse()}
         </div>
       </div>
       </div>
