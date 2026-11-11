@@ -958,10 +958,11 @@ function PalaceCell({
         </div>
       </div>
 
-      {/* 右下角由上往下：陰煞、蜚廉、指背和鸞喜（本命、大限、流年）；祿（本命祿存和各層的祿，格子有空位才單獨一排）；
-          最下排是煞（本命擎羊、陀羅、火星、鈴星和各層的羊、陀），沒空位時祿排在這一排的最前面。 */}
+      {/* 右下角兩排：上排是陰煞、蜚廉、指背和鸞喜（本命、大限、流年），祿（本命祿存和各層的祿）也放這一排、排在這些星左邊；
+          最下排是煞（本命擎羊、陀羅、火星、鈴星和各層的羊、陀）。上排原本有星、加了祿會擠成兩行時，祿才併到煞那排（2026/11/11 皐月） */}
       <div data-corner className="mt-auto flex flex-col items-end gap-1 px-1.5 pb-1 @5xl:absolute @5xl:right-0 @5xl:bottom-0 @5xl:px-2.5 @5xl:pb-1.5">
-        <div className={`justify-end ${FLOW_ROW}`}>
+        <div data-upper className={`justify-end ${FLOW_ROW}`}>
+          {splitLu && luStars}
           {/* 陰煞、蜚廉是雜曜；指背是將前十二神落在這一宮的那一顆 */}
           {palace.adjectiveStars
             .filter((star) => ALWAYS_SHOWN_STARS.has(star.name))
@@ -1004,7 +1005,6 @@ function PalaceCell({
               </span>
             ))}
         </div>
-        {splitLu && luStars.length > 0 && <div className={`justify-end ${FLOW_ROW}`}>{luStars}</div>}
         {/* 最下排從右往左、由下往上排：煞先排在最下面那一行，祿和煞併排時排在煞左邊，放不下才往上一行，煞一定在最下面（2026/11/11 皐月）。
             高度 2em＝兩個字的直書星名，空的時候也保留，鸞喜的位置才不會跑掉 */}
         <div
@@ -1232,8 +1232,8 @@ export function ChartView({
   }
   const gridRef = useRef<HTMLDivElement>(null);
   const fit = useFitToScreen(gridRef);
-  // 祿單獨一排的宮位：先全部和煞排在同一排畫一次，記下每格星曜區的高度；再全部拆開畫一次，
-  // 拆開後需要的高度沒超過原本高度的才拆（不會讓那一列格子變高）。
+  // 祿放上排的宮位：先全部和煞排在同一排畫一次，記下每格上排的高度；再全部把祿放上排畫一次，
+  // 上排原本沒星，或加了祿上排沒變高（沒擠成兩行）的才放上排，其他的祿併回煞那排。
   // 盤面內容或寬度變了就重量一次；量和重畫都在畫面顯示前完成，不輪詢
   const [luSplit, setLuSplit] = useState<"merged" | "trial" | Set<number>>("merged");
   const zoneHeights = useRef(new Map<number, number>());
@@ -1343,16 +1343,16 @@ export function ChartView({
     const part = (cell: HTMLElement, name: string) => cell.querySelector<HTMLElement>(`[data-${name}]`);
     if (luSplit === "merged") {
       zoneHeights.current.clear();
-      for (const cell of cells) zoneHeights.current.set(Number(cell.dataset.palace), part(cell, "zone")?.clientHeight ?? 0);
+      for (const cell of cells) zoneHeights.current.set(Number(cell.dataset.palace), part(cell, "upper")?.offsetHeight ?? 0);
       setLuSplit(cells.length ? "trial" : new Set());
       return;
     }
-    // 拆開後：星曜加右下角需要的高度，不超過合併時的星曜區高度就保留拆開
+    // 祿放上排後：上排原本空的就放；原本有星的，高度沒變（祿和原本的星排得進同一行）才放
     const next = new Set<number>();
     for (const cell of cells) {
       const index = Number(cell.dataset.palace);
-      const need = (part(cell, "stars")?.offsetHeight ?? 0) + (part(cell, "corner")?.offsetHeight ?? 0);
-      if (need <= (zoneHeights.current.get(index) ?? 0)) next.add(index);
+      const before = zoneHeights.current.get(index) ?? 0;
+      if (before === 0 || (part(cell, "upper")?.offsetHeight ?? 0) <= before) next.add(index);
     }
     setLuSplit(next);
   });
